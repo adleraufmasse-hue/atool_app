@@ -4,8 +4,6 @@ workflows:
     max_build_duration: 60
     instance_type: mac_mini_m2
 
-  
-
     environment:
       flutter: stable
       xcode: latest
@@ -29,9 +27,16 @@ workflows:
             echo "Kein ios/Podfile vorhanden – überspringe pod install."
           fi
 
+      - name: iOS Code Signing konfigurieren
+        script: |
+          keychain initialize
+          keychain add-certificates
+          xcode-project use-profiles
+
       - name: iOS IPA bauen
         script: |
-          flutter build ipa --release
+          flutter build ipa --release \
+            --export-options-plist=$CM_EXPORT_OPTIONS_PLIST
 
     artifacts:
       - build/ios/ipa/*.ipa
