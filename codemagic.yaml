@@ -31,10 +31,8 @@ workflows:
 
       - name: iOS IPA bauen
         script: |
-          flutter build ipa --release \
-            --export-options-plist=$CM_EXPORT_OPTIONS_PLIST
+          flutter build ipa --release
 
     artifacts:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
-
