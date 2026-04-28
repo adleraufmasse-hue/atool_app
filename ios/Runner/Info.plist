@@ -4,6 +4,10 @@
 <dict>
 	<key>NSCameraUsageDescription</key>
 	<string>Die Kamera wird verwendet, um Etiketten und Artikelnummern per OCR zu erkennen.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Die Fotobibliothek wird verwendet, um ein vorhandenes Bild eines Etiketts auszuwählen und daraus Artikelnummern per OCR zu erkennen.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Die App speichert keine Bilder in der Fotobibliothek. Diese Berechtigung wird nur benötigt, falls iOS oder verwendete Bibliotheken das Speichern von Dateien anfordern.</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>
