@@ -33,9 +33,15 @@ workflows:
           keychain add-certificates
           xcode-project use-profiles
 
+      - name: ExportOptions prüfen
+        script: |
+          ls -la /Users/builder/export_options.plist
+          cat /Users/builder/export_options.plist
+
       - name: iOS IPA bauen
         script: |
-          flutter build ipa --release
+          flutter build ipa --release \
+            --export-options-plist=/Users/builder/export_options.plist
 
     artifacts:
       - build/ios/ipa/*.ipa
