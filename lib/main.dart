@@ -506,6 +506,8 @@ class _LoginPageState extends State<LoginPage> {
   Future<void> _login() async {
     FocusScope.of(context).unfocus();
 
+    if (_isLoading) return;
+
     setState(() {
       _isLoading = true;
       _errorMessage = '';
@@ -534,18 +536,20 @@ class _LoginPageState extends State<LoginPage> {
         );
       } else {
         if (!mounted) return;
+
         setState(() {
           _errorMessage = mapLoginErrorMessage(data);
         });
       }
     } catch (_) {
       if (!mounted) return;
+      
       setState(() {
         _errorMessage =
             'Verbindung fehlgeschlagen. Bitte Internet und Server prüfen.';
       });
     } finally {
-      if (!mounted) {
+      if (mounted) {
       setState(() {
         _isLoading = false;
       });
