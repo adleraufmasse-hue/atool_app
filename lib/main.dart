@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart'
+  show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'dart:io';
+import 'package:image/image.dart' as img;
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:image_picker/image_picker.dart';
@@ -543,7 +545,7 @@ class _LoginPageState extends State<LoginPage> {
       }
     } catch (_) {
       if (!mounted) return;
-      
+
       setState(() {
         _errorMessage =
             'Verbindung fehlgeschlagen. Bitte Internet und Server prüfen.';
@@ -1021,6 +1023,8 @@ class MainSearchPage extends StatefulWidget {
 
 class _MainSearchPageState extends State<MainSearchPage> {
   static const int minSearchLen = 2;
+
+  bool get _isIosOcrMode => defaultTargetPlatform == TargetPlatform.iOS;
 
   bool _pageLoading = true;
   bool _countLoading = true;
@@ -1808,6 +1812,8 @@ bool _looksLikeModelCandidateTokens(List<String> tokens) {
   return hasModelLetters && hasModelNumber;
 }
 
+
+
 List<String> _tokenizeSmartOcr(String input) {
   final normalized = _normalizeOcrSearchTerm(input);
 
@@ -1819,24 +1825,150 @@ List<String> _tokenizeSmartOcr(String input) {
       .toList();
 }
 
+List<String> _buildIosExtraOcrCandidates(
+  String rawText,
+  List<OcrBoxCandidate> boxes,
+) {
+  final result = <String>{};
+
+  void addCandidate(String value) {
+    final normalized = _normalizeOcrSearchTerm(value);
+    if (normalized.length < minSearchLen) return;
+
+    // iOS-Zusatzlogik soll keine langen Barcodes übernehmen.
+    if (_isLikelyBarcodeNumber(normalized)) {
+      debugPrint('iOS EXTRA OCR BARCODE SKIPPED: $normalized');
+      return;
+    }
+
+  if (_isManufacturerOcrToken(normalized)) return;
+
+    final tokens = _tokenizeSmartOcr(normalized);
+    if (tokens.isEmpty) return;
+
+    final hasDigit = RegExp(r'\d').hasMatch(normalized);
+    final hasStrongToken = tokens.any(_looksLikeStrongArticleToken);
+    final looksLikeModel = _looksLikeModelCandidateTokens(tokens);
+
+    // Nur Begriffe übernehmen, die wie Artikel-/Modellnummern aussehen.
+    if (hasDigit || hasStrongToken || looksLikeModel) {
+      result.add(normalized);
+    }
+  }
+
+  final sources = <String>[
+    ...rawText.split(RegExp(r'[\r\n]+')),
+    ...boxes.map((e) => e.text),
+  ];
+
+  for (final source in sources) {
+    final cleanSource = source.trim();
+    if (cleanSource.isEmpty) continue;
+
+    // Ganze Zeile/Box übernehmen.
+    addCandidate(cleanSource);
+
+    final tokens = _tokenizeSmartOcr(cleanSource);
+    if (tokens.length < 2) continue;
+
+    // iOS trennt OCR manchmal ungünstig.
+    // Deshalb aus Zeilen zusätzliche 2er- bis 5er-Kombinationen bilden.
+    for (int i = 0; i < tokens.length; i++) {
+      for (int len = 2; len <= 5; len++) {
+        if (i + len > tokens.length) continue;
+
+        final part = tokens.sublist(i, i + len).join(' ');
+        addCandidate(part);
+      }
+    }
+  }
+
+  return result.toList();
+}
+
+Future<List<({String path, int rotation})>> _buildIosOcrImageVariants(
+  String originalPath,
+) async {
+  // Android bleibt unverändert: nur Originalbild.
+  if (!_isIosOcrMode) {
+    return [(path: originalPath, rotation: 0)];
+  }
+
+  final variants = <({String path, int rotation})>[
+    (path: originalPath, rotation: 0),
+  ];
+
+  try {
+    final bytes = await File(originalPath).readAsBytes();
+    final decoded = img.decodeImage(bytes);
+
+    if (decoded == null) {
+      return variants;
+    }
+
+    // Wichtigster iOS-Fall: Etikett steht auf dem Kopf.
+    final rotated180 = img.copyRotate(decoded, angle: 180);
+    final rotated180Path =
+        '${Directory.systemTemp.path}/atool_ocr_rotated_180_${DateTime.now().millisecondsSinceEpoch}.jpg';
+
+    await File(rotated180Path).writeAsBytes(
+      img.encodeJpg(rotated180, quality: 100),
+    );
+
+    variants.add((path: rotated180Path, rotation: 180));
+
+    // Optional, aber hilfreich bei quer fotografierten Etiketten.
+    final rotated90 = img.copyRotate(decoded, angle: 90);
+    final rotated90Path =
+        '${Directory.systemTemp.path}/atool_ocr_rotated_90_${DateTime.now().millisecondsSinceEpoch}.jpg';
+
+    await File(rotated90Path).writeAsBytes(
+      img.encodeJpg(rotated90, quality: 100),
+    );
+
+    variants.add((path: rotated90Path, rotation: 90));
+
+    final rotated270 = img.copyRotate(decoded, angle: 270);
+    final rotated270Path =
+        '${Directory.systemTemp.path}/atool_ocr_rotated_270_${DateTime.now().millisecondsSinceEpoch}.jpg';
+
+    await File(rotated270Path).writeAsBytes(
+      img.encodeJpg(rotated270, quality: 100),
+    );
+
+    variants.add((path: rotated270Path, rotation: 270));
+  } catch (e) {
+    debugPrint('iOS OCR ROTATION FAILED: $e');
+  }
+
+  return variants;
+}
+
 List<String> _buildSmartOcrCandidates(
   String rawText,
   List<OcrBoxCandidate> boxes,
 ) {
   final candidates = <String>[];
 
-  void addCandidate(String value) {
-    final cleaned = _normalizeOcrSearchTerm(value);
-    if (cleaned.length < minSearchLen) return;
+void addCandidate(String value) {
+  final cleaned = _normalizeOcrSearchTerm(value);
+  if (cleaned.length < minSearchLen) return;
 
-    // Sehr lange Zeilen sind meist Beschreibungen, Adressen oder Liefertexte.
-    // Kurze Kombinationen wie "MONO D100L" bleiben erlaubt.
-    if (cleaned.length > 36) return;
-
-    if (!candidates.contains(cleaned)) {
-      candidates.add(cleaned);
-    }
+  // Nur iOS:
+  // Lange reine Barcode-/Seriennummern nicht als Smart-Kandidat verwenden.
+  if (_isIosOcrMode && _isLikelyBarcodeNumber(cleaned)) {
+    debugPrint('iOS SMART OCR BARCODE SKIPPED: $cleaned');
+    return;
   }
+
+  // Sehr lange Zeilen sind meist Beschreibungen, Adressen oder Liefertexte.
+  // Kurze Kombinationen wie "MONO D100L" bleiben erlaubt.
+  if (cleaned.length > 36) return;
+
+  if (!candidates.contains(cleaned)) {
+    candidates.add(cleaned);
+  }
+}
 
   for (final box in boxes) {
     final boxText = _normalizeOcrSearchTerm(box.text);
@@ -1879,6 +2011,14 @@ List<String> _buildSmartOcrCandidates(
         .allMatches(boxText)) {
       final value = match.group(0);
       if (value != null) addCandidate(value);
+    }
+  }
+
+  // iOS-Zusatzkandidaten NACH der Box-Schleife ergänzen.
+  // Android bleibt unverändert.
+  if (_isIosOcrMode) {
+    for (final candidate in _buildIosExtraOcrCandidates(rawText, boxes)) {
+      addCandidate(candidate);
     }
   }
 
@@ -2033,22 +2173,40 @@ List<OcrCatalogMatch> _findFastNumberOcrMatches(
 
 void addNumber(String value) {
   final cleaned = value.trim();
+
   if (cleaned.length < 5) return;
 
-  if (!numberCandidates.contains(cleaned)) {
-    numberCandidates.add(cleaned);
+  final digitsOnly = cleaned.replaceAll(RegExp(r'[^0-9]'), '');
+
+  // Nur iOS:
+  // Lange reine Barcode-/Seriennummern komplett ignorieren.
+  // Beispiel: 00235469970000000911
+  if (_isIosOcrMode &&
+      digitsOnly.length >= 11 &&
+      RegExp(r'^[0-9\s.\-/]+$').hasMatch(cleaned)) {
+    debugPrint('iOS OCR BARCODE SKIPPED: $cleaned');
+    return;
   }
+
+  void addUnique(String candidate) {
+    final c = candidate.trim();
+    if (c.length < 5) return;
+
+    if (!numberCandidates.contains(c)) {
+      numberCandidates.add(c);
+    }
+  }
+
+  addUnique(cleaned);
 
   final compact = cleaned.replaceAll(RegExp(r'[^0-9a-zA-Z]'), '');
 
-  if (compact.length >= 5 && !numberCandidates.contains(compact)) {
-    numberCandidates.add(compact);
-  }
+  if (compact.length >= 5) {
+    addUnique(compact);
 
-  if (compact.startsWith('0')) {
-    final stripped = compact.replaceFirst(RegExp(r'^0+'), '');
-    if (stripped.length >= 5 && !numberCandidates.contains(stripped)) {
-      numberCandidates.add(stripped);
+    if (compact.startsWith('0')) {
+      final stripped = compact.replaceFirst(RegExp(r'^0+'), '');
+      addUnique(stripped);
     }
   }
 }
@@ -2092,13 +2250,29 @@ for (final box in boxes) {
   }
 }
 
+if (_isIosOcrMode) {
+  numberCandidates.sort((a, b) {
+    final priorityCompare =
+        _ocrCandidatePriority(a).compareTo(_ocrCandidatePriority(b));
+
+    if (priorityCompare != 0) {
+      return priorityCompare;
+    }
+
+    return a.length.compareTo(b.length);
+  });
+}
+
   debugPrint('FAST OCR NUMBER CANDIDATES: $numberCandidates');
 
   final results = <OcrCatalogMatch>[];
   final seen = <String>{};
 
-  for (final number in numberCandidates.take(12)) {
-    final found = _fastLocalOcrSearch(number, limit: 3);
+  final numberLimit = _isIosOcrMode ? 20 : 12;
+  final searchLimit = _isIosOcrMode ? 5 : 3;
+
+  for (final number in numberCandidates.take(numberLimit)) {
+    final found = _fastLocalOcrSearch(number, limit: searchLimit);
 
     for (final item in found) {
       final key = '${item.id}|${item.basename}';
@@ -2127,6 +2301,50 @@ for (final box in boxes) {
   return results;
 }
 
+bool _isLikelyBarcodeNumber(String value) {
+  final digits = value.replaceAll(RegExp(r'[^0-9]'), '');
+
+  // Sehr lange reine Zahlen sind oft Barcode-, Serien- oder Versandnummern.
+  if (digits.length >= 11 && RegExp(r'^[0-9\s.\-/]+$').hasMatch(value)) {
+    return true;
+  }
+
+  return false;
+}
+
+int _ocrCandidatePriority(String value) {
+  final normalized = _normalizeOcrSearchTerm(value);
+  final compact = normalized.replaceAll(RegExp(r'[^a-z0-9]'), '');
+
+  final hasLetter = RegExp(r'[a-z]').hasMatch(compact);
+  final hasDigit = RegExp(r'\d').hasMatch(compact);
+  final digitsOnly = compact.replaceAll(RegExp(r'[^0-9]'), '');
+
+  // Modellnummern wie EH601HFB1E, KMDA7473, D100L bevorzugen.
+  if (hasLetter && hasDigit && compact.length >= 5) {
+    return 0;
+  }
+
+  // Formatierte Artikelnummern wie 127.0658.064 bevorzugen.
+  if (RegExp(r'\d{2,5}[.\-\/]\d{2,6}([.\-\/]\d{2,6})+')
+      .hasMatch(normalized)) {
+    return 1;
+  }
+
+  // Kurze/mittlere Materialnummern wie 00235469, 521841 bevorzugen.
+  if (digitsOnly.length >= 5 && digitsOnly.length <= 10) {
+    return 2;
+  }
+
+  // Normale Texte danach.
+  if (!_isLikelyBarcodeNumber(normalized)) {
+    return 3;
+  }
+
+  // Lange Barcode-Zahlen ganz nach hinten.
+  return 9;
+}
+
 List<OcrCatalogMatch> _findBestSmartOcrCatalogMatches(
   String rawText,
   List<OcrBoxCandidate> boxes,
@@ -2138,8 +2356,14 @@ List<OcrCatalogMatch> _findBestSmartOcrCatalogMatches(
 
   // Wichtig für Geschwindigkeit:
   // Nicht mehr 80 Kandidaten prüfen, sondern nur die besten 15.
-  for (final candidate in candidates.take(11)) {
-    final prefilteredItems = _fastLocalOcrSearch(candidate, limit: 8);
+  final candidateLimit = _isIosOcrMode ? 25 : 12;
+
+  for (final candidate in candidates.take(candidateLimit)) {
+    final prefilterLimit = _isIosOcrMode ? 15 : 8;
+    final prefilteredItems = _fastLocalOcrSearch(
+      candidate,
+      limit: prefilterLimit,
+  );
 
     if (prefilteredItems.isEmpty) {
       continue;
@@ -2204,7 +2428,7 @@ Future<void> _runLocalOcr(ImageSource source) async {
     final picker = ImagePicker();
     final XFile? picked = await picker.pickImage(
       source: source,
-      imageQuality: 90,
+      imageQuality: _isIosOcrMode ? 100 : 90,
     );
 
     if (picked == null) return;
@@ -2219,98 +2443,154 @@ Future<void> _runLocalOcr(ImageSource source) async {
       _activeHighlightTerm = '';
     });
 
-    final inputImage = InputImage.fromFilePath(picked.path);
-    final textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
+    final imageVariants = await _buildIosOcrImageVariants(picked.path);
 
-    final RecognizedText recognizedText =
-        await textRecognizer.processImage(inputImage);
+    List<CatalogItem> bestMatches = [];
+    String bestUsedSearchText = '';
+    int bestSmartOcrScore = 0;
+    List<String> bestVisibleBoxTexts = [];
+    String bestRawText = '';
+    int bestRotation = 0;
 
-    await textRecognizer.close();
+    for (final variant in imageVariants) {
+      final inputImage = InputImage.fromFilePath(variant.path);
+      final textRecognizer = TextRecognizer(script: TextRecognitionScript.latin);
 
-    if (!mounted) return;
+      RecognizedText recognizedText;
 
-    final sortedBoxes = _extractOcrBoxCandidatesSorted(recognizedText);
-    final rawText = recognizedText.text.trim();
-    final preferredArticle = _extractPreferredArticleNumber(rawText);
-    final visibleBoxTexts = sortedBoxes.map((e) => e.text).take(12).toList();
+      try {
+        recognizedText = await textRecognizer.processImage(inputImage);
+      } finally {
+        await textRecognizer.close();
+      }
 
-    debugPrint('OCR RAW TEXT: $rawText');
-    debugPrint('OCR PREFERRED ARTICLE: $preferredArticle');
-    debugPrint(
-      'OCR BOXES SORTED: ${sortedBoxes.map((e) => '${e.text} (${e.area.toStringAsFixed(0)})').toList()}',
-    );
+      final sortedBoxes = _extractOcrBoxCandidatesSorted(recognizedText);
+      final rawText = recognizedText.text.trim();
+      final preferredArticle = _extractPreferredArticleNumber(rawText);
+      final visibleBoxTexts = sortedBoxes.map((e) => e.text).take(12).toList();
 
-List<CatalogItem> matches = [];
-String usedSearchText = '';
-int smartOcrScore = 0;
+      debugPrint('OCR VARIANT ROTATION: ${variant.rotation}');
+      debugPrint('OCR RAW TEXT: $rawText');
+      debugPrint('OCR PREFERRED ARTICLE: $preferredArticle');
+      debugPrint(
+        'OCR BOXES SORTED: ${sortedBoxes.map((e) => '${e.text} (${e.area.toStringAsFixed(0)})').toList()}',
+      );
 
-final fastNumberMatches = _findFastNumberOcrMatches(rawText, sortedBoxes);
+      List<CatalogItem> matches = [];
+      String usedSearchText = '';
+      int smartOcrScore = 0;
 
-if (fastNumberMatches.isNotEmpty) {
-  matches = fastNumberMatches.map((e) => e.item).toList();
-  usedSearchText = fastNumberMatches.first.usedTerm;
-  smartOcrScore = fastNumberMatches.first.score;
-} else {
-  final smartMatches = _findBestSmartOcrCatalogMatches(rawText, sortedBoxes);
+      final fastNumberMatches = _findFastNumberOcrMatches(rawText, sortedBoxes);
 
-  if (smartMatches.isNotEmpty) {
-    matches = smartMatches.map((e) => e.item).toList();
-    usedSearchText = smartMatches.first.usedTerm;
-    smartOcrScore = smartMatches.first.score;
-  }
-}
+      if (fastNumberMatches.isNotEmpty) {
+        matches = fastNumberMatches.map((e) => e.item).toList();
+        usedSearchText = fastNumberMatches.first.usedTerm;
+        smartOcrScore = fastNumberMatches.first.score;
+      } else {
+        final smartMatches = _findBestSmartOcrCatalogMatches(rawText, sortedBoxes);
 
-    // Sehr eindeutiger Fallback, falls deine Preferred-Article-Erkennung
-    // irgendwann eine konkrete Nummer erkennt.
-    if (matches.isEmpty &&
-        preferredArticle != null &&
-        preferredArticle.isNotEmpty) {
-      final found = _localOcrSearch(preferredArticle);
+        if (smartMatches.isNotEmpty) {
+          matches = smartMatches.map((e) => e.item).toList();
+          usedSearchText = smartMatches.first.usedTerm;
+          smartOcrScore = smartMatches.first.score;
+        }
+      }
 
-      if (found.isNotEmpty) {
-        matches = found.take(3).toList();
-        usedSearchText = preferredArticle;
-        smartOcrScore = 9999;
+      // Sehr eindeutiger Fallback, falls Preferred-Article-Erkennung
+      // eine konkrete Nummer erkennt.
+      if (matches.isEmpty &&
+          preferredArticle != null &&
+          preferredArticle.isNotEmpty &&
+          !(_isIosOcrMode && _isLikelyBarcodeNumber(preferredArticle))) {
+        final found = _localOcrSearch(preferredArticle);
+
+        if (found.isNotEmpty) {
+          matches = found.take(3).toList();
+          usedSearchText = preferredArticle;
+          smartOcrScore = 9999;
+        }
+      }
+
+      // Falls noch kein Treffer da ist, trotzdem brauchbare OCR-Vorschläge merken.
+      if (bestVisibleBoxTexts.isEmpty && visibleBoxTexts.isNotEmpty) {
+        bestVisibleBoxTexts = visibleBoxTexts;
+        bestRawText = rawText;
+        bestRotation = variant.rotation;
+      }
+
+      if (matches.isNotEmpty && smartOcrScore > bestSmartOcrScore) {
+        bestMatches = matches;
+        bestUsedSearchText = usedSearchText;
+        bestSmartOcrScore = smartOcrScore;
+        bestVisibleBoxTexts = visibleBoxTexts;
+        bestRawText = rawText;
+        bestRotation = variant.rotation;
+      }
+
+      // Wenn ein sehr sicherer Treffer gefunden wurde, müssen wir nicht weiter testen.
+      if (bestSmartOcrScore >= 9999) {
+        break;
+      }
+    }
+
+    // Temporäre iOS-Rotationsbilder löschen.
+    for (final variant in imageVariants) {
+      if (variant.path != picked.path) {
+        try {
+          final file = File(variant.path);
+          if (await file.exists()) {
+            await file.delete();
+          }
+        } catch (_) {
+          // Nicht kritisch.
+        }
       }
     }
 
     if (!mounted) return;
 
-    if (matches.isEmpty) {
+    debugPrint('SMART OCR BEST ROTATION: $bestRotation');
+    debugPrint('SMART OCR BEST RAW TEXT: $bestRawText');
+    debugPrint('SMART OCR FINAL SCORE: $bestSmartOcrScore');
+
+    if (bestMatches.isEmpty) {
       setState(() {
         _searchLoading = false;
         _results = [];
-        _ocrBoxTexts = visibleBoxTexts;
+        _ocrBoxTexts = bestVisibleBoxTexts;
         _showOcrSuggestions = true;
-        _message = 'Keine hinterlegten Artikel im Aufkleber gefunden.';
+        _message = _isIosOcrMode
+            ? 'Keine hinterlegten Artikel im Aufkleber gefunden. Tipp: Etikett gerade und möglichst bildfüllend fotografieren.'
+            : 'Keine hinterlegten Artikel im Aufkleber gefunden.';
       });
       return;
     }
 
     setState(() {
       _searchLoading = false;
-      _results = matches;
-      _ocrBoxTexts = visibleBoxTexts;
+      _results = bestMatches;
+      _ocrBoxTexts = bestVisibleBoxTexts;
       _showOcrSuggestions = false;
-      _activeHighlightTerm = usedSearchText;
+      _activeHighlightTerm = bestUsedSearchText;
 
-      if (usedSearchText.isNotEmpty) {
+      if (bestUsedSearchText.isNotEmpty) {
+        final rotationInfo =
+            _isIosOcrMode && bestRotation != 0 ? ' Bilddrehung: $bestRotation°.' : '';
+
         _message =
-            'ATool-Treffer über intelligente Suche: $usedSearchText – beste ${matches.length} Treffer angezeigt.';
+            'ATool-Treffer über intelligente Suche: $bestUsedSearchText – beste ${bestMatches.length} Treffer angezeigt.$rotationInfo';
       } else {
         _message = '';
       }
     });
 
-    if (usedSearchText.isNotEmpty) {
-      _setSearchTextSilently(usedSearchText);
+    if (bestUsedSearchText.isNotEmpty) {
+      _setSearchTextSilently(bestUsedSearchText);
     }
-
-    debugPrint('SMART OCR FINAL SCORE: $smartOcrScore');
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('${matches.length} Artikel aus dem Aufkleber gefunden.'),
+        content: Text('${bestMatches.length} Artikel aus dem Aufkleber gefunden.'),
       ),
     );
   } catch (e, stackTrace) {
