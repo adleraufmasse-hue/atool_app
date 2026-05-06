@@ -58,39 +58,64 @@ class AppConfig {
 class AppStorage {
   static const FlutterSecureStorage storage = FlutterSecureStorage();
   static const Uuid uuid = Uuid();
+  static const Duration secureStorageTimeout = Duration(seconds: 3);
+
+  static Future<String?> _read(String key) async {
+    try {
+      return await storage.read(key: key).timeout(secureStorageTimeout);
+    } catch (_) {
+      await _delete(key);
+      return null;
+    }
+  }
+
+  static Future<void> _write(String key, String value) async {
+    try {
+      await storage.write(key: key, value: value).timeout(secureStorageTimeout);
+    } catch (_) {
+      await _delete(key);
+      await storage.write(key: key, value: value).timeout(secureStorageTimeout);
+    }
+  }
+
+  static Future<void> _delete(String key) async {
+    try {
+      await storage.delete(key: key).timeout(secureStorageTimeout);
+    } catch (_) {}
+  }
 
   static Future<String> getOrCreateDeviceUuid() async {
-    final existing = await storage.read(key: 'device_uuid');
+    final existing = await _read('device_uuid');
     if (existing != null && existing.isNotEmpty) return existing;
 
     final newUuid = uuid.v4();
-    await storage.write(key: 'device_uuid', value: newUuid);
+    await _write('device_uuid', newUuid);
     return newUuid;
   }
 
   static Future<String?> getAccessToken() async {
-    return storage.read(key: 'access_token');
+    return _read('access_token');
   }
 
   static Future<String?> getRefreshToken() async {
-    return storage.read(key: 'refresh_token');
+    return _read('refresh_token');
   }
 
   static Future<void> saveTokens({
     required String accessToken,
     required String refreshToken,
   }) async {
-    await storage.write(key: 'access_token', value: accessToken);
-    await storage.write(key: 'refresh_token', value: refreshToken);
+    await _write('access_token', accessToken);
+    await _write('refresh_token', refreshToken);
   }
 
   static Future<void> updateAccessToken(String accessToken) async {
-    await storage.write(key: 'access_token', value: accessToken);
+    await _write('access_token', accessToken);
   }
 
   static Future<void> clearTokens() async {
-    await storage.delete(key: 'access_token');
-    await storage.delete(key: 'refresh_token');
+    await _delete('access_token');
+    await _delete('refresh_token');
   }
 }
 
@@ -456,19 +481,26 @@ class _SplashPageState extends State<SplashPage> {
   }
 
   Future<void> _checkLogin() async {
-    await AppStorage.getOrCreateDeviceUuid();
+    try {
+      await AppStorage.getOrCreateDeviceUuid();
 
-    final accessToken = await AppStorage.getAccessToken();
-    final refreshToken = await AppStorage.getRefreshToken();
+      final accessToken = await AppStorage.getAccessToken();
+      final refreshToken = await AppStorage.getRefreshToken();
 
-    if (!mounted) return;
+      if (!mounted) return;
 
-    if ((accessToken != null && accessToken.isNotEmpty) ||
-        (refreshToken != null && refreshToken.isNotEmpty)) {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const MainSearchPage()),
-      );
-    } else {
+      if ((accessToken != null && accessToken.isNotEmpty) ||
+          (refreshToken != null && refreshToken.isNotEmpty)) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const MainSearchPage()),
+        );
+      } else {
+        Navigator.of(
+          context,
+        ).pushReplacement(MaterialPageRoute(builder: (_) => const LoginPage()));
+      }
+    } catch (_) {
+      if (!mounted) return;
       Navigator.of(
         context,
       ).pushReplacement(MaterialPageRoute(builder: (_) => const LoginPage()));
