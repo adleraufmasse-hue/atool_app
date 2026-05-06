@@ -97,7 +97,7 @@ import UIKit
 
     do {
       let bookmarkData = try url.bookmarkData(
-        options: [.withSecurityScope],
+        options: [],
         includingResourceValuesForKeys: nil,
         relativeTo: nil
       )
@@ -146,7 +146,7 @@ import UIKit
     do {
       let directoryUrl = try URL(
         resolvingBookmarkData: bookmarkData,
-        options: [.withSecurityScope],
+        options: [],
         relativeTo: nil,
         bookmarkDataIsStale: &isStale
       )
