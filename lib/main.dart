@@ -11,6 +11,7 @@ import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart
 
 import 'package:file_picker/file_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:flutter/services.dart';
 
 import 'package:device_info_plus/device_info_plus.dart';
@@ -54,6 +55,8 @@ class AppConfig {
       'https://adler-aufmasse.de/wp-content/Adler/';
   static const String ocrUrl = 'https://adler-aufmasse.de/wp-json/adler/v1/ocr';
 }
+
+bool get selfRegistrationAvailable => !kIsWeb && !Platform.isIOS;
 
 class AppStorage {
   static const FlutterSecureStorage storage = FlutterSecureStorage();
@@ -491,6 +494,25 @@ class _SplashPageState extends State<SplashPage> {
 
       if ((accessToken != null && accessToken.isNotEmpty) ||
           (refreshToken != null && refreshToken.isNotEmpty)) {
+        final data = await ApiService.getLicenseStatus();
+
+        if (!mounted) return;
+
+        if (data['success'] != true) {
+          await AppStorage.clearTokens();
+          if (!mounted) return;
+
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (_) => LoginPage(
+                initialErrorMessage:
+                    'Sitzung oder Lizenz ist nicht mehr gueltig. Bitte erneut anmelden.',
+              ),
+            ),
+          );
+          return;
+        }
+
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (_) => const MainSearchPage()),
         );
@@ -500,10 +522,17 @@ class _SplashPageState extends State<SplashPage> {
         ).pushReplacement(MaterialPageRoute(builder: (_) => const LoginPage()));
       }
     } catch (_) {
+      await AppStorage.clearTokens();
+
       if (!mounted) return;
-      Navigator.of(
-        context,
-      ).pushReplacement(MaterialPageRoute(builder: (_) => const LoginPage()));
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => const LoginPage(
+            initialErrorMessage:
+                'Lizenz konnte nicht geprueft werden. Bitte erneut anmelden.',
+          ),
+        ),
+      );
     }
   }
 
@@ -514,7 +543,9 @@ class _SplashPageState extends State<SplashPage> {
 }
 
 class LoginPage extends StatefulWidget {
-  const LoginPage({super.key});
+  final String initialErrorMessage;
+
+  const LoginPage({super.key, this.initialErrorMessage = ''});
 
   @override
   State<LoginPage> createState() => _LoginPageState();
@@ -532,6 +563,7 @@ class _LoginPageState extends State<LoginPage> {
   @override
   void initState() {
     super.initState();
+    _errorMessage = widget.initialErrorMessage;
     _loadDeviceUuid();
   }
 
@@ -753,31 +785,47 @@ class _LoginPageState extends State<LoginPage> {
                               ),
                             ),
                             const SizedBox(height: 12),
-                            TextButton(
-                              onPressed: _isLoading
-                                  ? null
-                                  : () async {
-                                      final result = await Navigator.of(context)
-                                          .push<String>(
-                                            MaterialPageRoute(
-                                              builder: (_) =>
-                                                  const RegisterTrialPage(),
-                                            ),
-                                          );
 
-                                      if (result != null && result.isNotEmpty) {
-                                        _emailController.text = result;
-                                        setState(() {
-                                          _errorMessage = '';
-                                          _successMessage =
-                                              'Testzugang erstellt. Bitte jetzt mit deiner E-Mail einloggen.';
-                                        });
-                                      }
-                                    },
-                              child: const Text(
-                                '10 Tage testen / Registrieren',
+                            if (!selfRegistrationAvailable)
+                              const Text(
+                                'Zugang nur für bereits freigeschaltete Firmenkunden.\n'
+                                'Bitte verwenden Sie die Zugangsdaten, die Ihnen von Ihrem Unternehmen bereitgestellt wurden.',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: Colors.black54,
+                                  height: 1.35,
+                                ),
+                              )
+                            else
+                              TextButton(
+                                onPressed: _isLoading
+                                    ? null
+                                    : () async {
+                                        final result =
+                                            await Navigator.of(
+                                              context,
+                                            ).push<String>(
+                                              MaterialPageRoute(
+                                                builder: (_) =>
+                                                    const RegisterTrialPage(),
+                                              ),
+                                            );
+
+                                        if (result != null &&
+                                            result.isNotEmpty) {
+                                          _emailController.text = result;
+                                          setState(() {
+                                            _errorMessage = '';
+                                            _successMessage =
+                                                'Testzugang erstellt. Bitte jetzt mit deiner E-Mail einloggen.';
+                                          });
+                                        }
+                                      },
+                                child: const Text(
+                                  '10 Tage testen / Registrieren',
+                                ),
                               ),
-                            ),
                           ],
                         ),
                       ),
@@ -1026,8 +1074,13 @@ class OcrCandidate {
 class OcrBoxCandidate {
   final String text;
   final double area;
+  final double height;
 
-  const OcrBoxCandidate({required this.text, required this.area});
+  const OcrBoxCandidate({
+    required this.text,
+    required this.area,
+    required this.height,
+  });
 }
 
 class OcrCatalogMatch {
@@ -1051,8 +1104,11 @@ class MainSearchPage extends StatefulWidget {
   State<MainSearchPage> createState() => _MainSearchPageState();
 }
 
-class _MainSearchPageState extends State<MainSearchPage> {
-  static const int minSearchLen = 2;
+class _MainSearchPageState extends State<MainSearchPage>
+    with WidgetsBindingObserver {
+  static const int minSearchLen = 4;
+  static const int manualSearchLen = 4;
+  static const int maxOcrResultCount = 4;
   static const MethodChannel _downloadChannel = MethodChannel(
     'de.adleraufmasse.atool/downloads',
   );
@@ -1063,14 +1119,19 @@ class _MainSearchPageState extends State<MainSearchPage> {
   bool _countLoading = true;
   bool _searchLoading = false;
   bool _showOcrSuggestions = false;
+  bool _ocrSearchActive = false;
+  bool _ocrCancelRequested = false;
+  int _ocrRunId = 0;
 
   String _message = '';
   final TextEditingController _searchController = TextEditingController();
   Timer? _debounce;
   bool _ignoreSearchControllerChange = false;
+  bool _licenseCheckInProgress = false;
 
   List<CatalogItem> _catalog = [];
   List<CatalogSearchEntry> _catalogSearchIndex = [];
+  Map<String, List<CatalogItem>> _ocrLookupIndex = {};
   List<CatalogItem> _results = [];
   String _activeHighlightTerm = '';
   List<String> _ocrBoxTexts = [];
@@ -1080,15 +1141,24 @@ class _MainSearchPageState extends State<MainSearchPage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _initPage();
     _searchController.addListener(_onSearchChanged);
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _debounce?.cancel();
     _searchController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_ensureActiveLicense());
+    }
   }
 
   void _setSearchTextSilently(String text) {
@@ -1105,10 +1175,75 @@ class _MainSearchPageState extends State<MainSearchPage> {
   }
 
   Future<void> _initPage() async {
+    final licenseOk = await _ensureActiveLicense();
+    if (!licenseOk) return;
+
     await Future.wait([_loadIndex(), _loadDwgDisplayCount()]);
   }
 
+  Future<bool> _ensureActiveLicense() async {
+    if (_licenseCheckInProgress) return true;
+
+    _licenseCheckInProgress = true;
+
+    try {
+      final data = await ApiService.getLicenseStatus();
+
+      if (data['success'] == true) return true;
+
+      await AppStorage.clearTokens();
+
+      if (!mounted) return false;
+
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder: (_) => LoginPage(
+            initialErrorMessage:
+                'Sitzung oder Lizenz ist nicht mehr gueltig. Bitte erneut anmelden.',
+          ),
+        ),
+        (route) => false,
+      );
+
+      return false;
+    } catch (_) {
+      await AppStorage.clearTokens();
+
+      if (!mounted) return false;
+
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder: (_) => const LoginPage(
+            initialErrorMessage:
+                'Lizenz konnte nicht geprueft werden. Bitte erneut anmelden.',
+          ),
+        ),
+        (route) => false,
+      );
+
+      return false;
+    } finally {
+      _licenseCheckInProgress = false;
+    }
+  }
+
   void _rebuildCatalogSearchIndex() {
+    final ocrLookupIndex = <String, List<CatalogItem>>{};
+
+    void addOcrLookupKey(CatalogItem item, String key) {
+      final trimmed = key.trim();
+      if (trimmed.length < minSearchLen) return;
+      if (_isLikelyBarcodeNumber(trimmed)) return;
+
+      final bucket = ocrLookupIndex.putIfAbsent(trimmed, () => []);
+      final itemKey = '${item.id}|${item.basename}';
+      if (!bucket.any(
+        (existing) => '${existing.id}|${existing.basename}' == itemKey,
+      )) {
+        bucket.add(item);
+      }
+    }
+
     _catalogSearchIndex = _catalog.map((item) {
       final rawFields = <String>[
         item.basename,
@@ -1139,6 +1274,12 @@ class _MainSearchPageState extends State<MainSearchPage> {
           .where((e) => e.length >= 2)
           .toSet();
 
+      for (final field in rawFields) {
+        for (final key in _buildOcrLookupKeys(field)) {
+          addOcrLookupKey(item, key);
+        }
+      }
+
       return CatalogSearchEntry(
         item: item,
         searchText: searchText,
@@ -1149,7 +1290,10 @@ class _MainSearchPageState extends State<MainSearchPage> {
       );
     }).toList();
 
+    _ocrLookupIndex = ocrLookupIndex;
+
     debugPrint('CATALOG SEARCH INDEX READY: ${_catalogSearchIndex.length}');
+    debugPrint('OCR LOOKUP INDEX READY: ${_ocrLookupIndex.length}');
   }
 
   Future<void> _loadIndex() async {
@@ -1197,7 +1341,7 @@ class _MainSearchPageState extends State<MainSearchPage> {
     _debounce?.cancel();
     final q = _searchController.text.trim();
 
-    if (q.length < minSearchLen) {
+    if (q.length < manualSearchLen) {
       setState(() {
         _results = [];
         _searchLoading = false;
@@ -1249,11 +1393,26 @@ class _MainSearchPageState extends State<MainSearchPage> {
 
   Set<String> _buildCompareVariants(String input) {
     final base = _normalizeForSearch(input);
+    var rawBase = input.toLowerCase().trim();
 
-    if (base.isEmpty) return {};
+    const replacements = {
+      '\u00e4': 'a',
+      '\u00f6': 'o',
+      '\u00fc': 'u',
+      '\u00df': 'ss',
+    };
+    replacements.forEach((key, value) {
+      rawBase = rawBase.replaceAll(key, value);
+    });
+
+    rawBase = rawBase.replaceAll(RegExp(r'[^a-z0-9/_. -]'), '');
+    rawBase = rawBase.replaceAll(RegExp(r'\s+'), ' ').trim();
+
+    if (base.isEmpty && rawBase.isEmpty) return {};
 
     final variants = <String>{
       base,
+      rawBase,
       base.replaceAll('-', ' '),
       base.replaceAll('/', ' '),
       base.replaceAll('.', ' '),
@@ -1279,6 +1438,26 @@ class _MainSearchPageState extends State<MainSearchPage> {
         }
       }
 
+      if (RegExp(r'^\d{5,7}0+$').hasMatch(compact)) {
+        final strippedTrailingZeros = compact.replaceFirst(RegExp(r'0+$'), '');
+        if (strippedTrailingZeros.length >= 4) {
+          extra.add(strippedTrailingZeros);
+        }
+      }
+
+      final numericPrefixWithSuffix = RegExp(
+        r'^(\d{4,5})\d*[a-z].*$',
+      ).firstMatch(compact);
+      if (numericPrefixWithSuffix != null) {
+        final prefix = numericPrefixWithSuffix.group(1);
+        if (prefix != null) extra.add(prefix);
+      }
+
+      if (RegExp(r'(?=.*[a-z])(?=.*\d)').hasMatch(compact)) {
+        extra.add(compact.replaceAll('o', '0'));
+        extra.add(compact.replaceAll('0', 'o'));
+      }
+
       // numerische Tokens innerhalb eines Ausdrucks normalisieren
       final tokenNormalized = v
           .split(RegExp(r'\s+'))
@@ -1301,6 +1480,30 @@ class _MainSearchPageState extends State<MainSearchPage> {
     variants.addAll(extra);
 
     return variants.where((e) => e.isNotEmpty).toSet();
+  }
+
+  Set<String> _buildOcrLookupKeys(String input) {
+    final keys = <String>{};
+
+    for (final variant in _buildCompareVariants(input)) {
+      final normalized = _normalizeForSearch(variant);
+      final compact = normalized.replaceAll(RegExp(r'[^a-z0-9]'), '');
+
+      if (normalized.length >= minSearchLen) {
+        keys.add(normalized);
+      }
+
+      if (compact.length >= minSearchLen) {
+        keys.add(compact);
+      }
+
+      if (RegExp(r'(?=.*[a-z])(?=.*\d)').hasMatch(compact)) {
+        keys.add(compact.replaceAll('o', '0'));
+        keys.add(compact.replaceAll('0', 'o'));
+      }
+    }
+
+    return keys.where((e) => e.length >= minSearchLen).toSet();
   }
 
   List<CatalogItem> _localSearch(String q) {
@@ -1487,7 +1690,13 @@ class _MainSearchPageState extends State<MainSearchPage> {
       final blockArea = blockBox.width * blockBox.height;
 
       if (blockText.isNotEmpty && blockArea > 0) {
-        candidates.add(OcrBoxCandidate(text: blockText, area: blockArea));
+        candidates.add(
+          OcrBoxCandidate(
+            text: blockText,
+            area: blockArea,
+            height: blockBox.height,
+          ),
+        );
       }
 
       for (final line in block.lines) {
@@ -1496,7 +1705,13 @@ class _MainSearchPageState extends State<MainSearchPage> {
         final lineArea = lineBox.width * lineBox.height;
 
         if (lineText.isNotEmpty && lineArea > 0) {
-          candidates.add(OcrBoxCandidate(text: lineText, area: lineArea));
+          candidates.add(
+            OcrBoxCandidate(
+              text: lineText,
+              area: lineArea,
+              height: lineBox.height,
+            ),
+          );
         }
       }
     }
@@ -1508,13 +1723,24 @@ class _MainSearchPageState extends State<MainSearchPage> {
       if (key.isEmpty) continue;
 
       final existing = deduped[key];
-      if (existing == null || c.area > existing.area) {
-        deduped[key] = OcrBoxCandidate(text: key, area: c.area);
+      if (existing == null ||
+          c.height > existing.height ||
+          (c.height == existing.height && c.area > existing.area)) {
+        deduped[key] = OcrBoxCandidate(
+          text: key,
+          area: c.area,
+          height: c.height,
+        );
       }
     }
 
     final sorted = deduped.values.toList()
-      ..sort((a, b) => b.area.compareTo(a.area));
+      ..sort((a, b) {
+        final heightCompare = b.height.compareTo(a.height);
+        if (heightCompare != 0) return heightCompare;
+
+        return b.area.compareTo(a.area);
+      });
 
     return sorted;
   }
@@ -1678,7 +1904,38 @@ class _MainSearchPageState extends State<MainSearchPage> {
     return _catalog.where(matches).take(50).toList();
   }
 
+  List<CatalogItem> _lookupOcrIndex(String q, {int limit = 20}) {
+    if (_ocrLookupIndex.isEmpty) return [];
+
+    final results = <CatalogItem>[];
+    final seen = <String>{};
+
+    for (final key in _buildOcrLookupKeys(q)) {
+      final items = _ocrLookupIndex[key];
+      if (items == null) continue;
+
+      for (final item in items) {
+        final itemKey = '${item.id}|${item.basename}';
+        if (seen.contains(itemKey)) continue;
+
+        seen.add(itemKey);
+        results.add(item);
+
+        if (results.length >= limit) {
+          return results;
+        }
+      }
+    }
+
+    return results;
+  }
+
   List<CatalogItem> _fastLocalOcrSearch(String q, {int limit = 20}) {
+    final indexedResults = _lookupOcrIndex(q, limit: limit);
+    if (indexedResults.isNotEmpty) {
+      return indexedResults;
+    }
+
     final qNorm = _normalizeForSearch(q);
     final qCompact = qNorm.replaceAll(RegExp(r'[^a-z0-9]'), '');
 
@@ -1796,9 +2053,9 @@ class _MainSearchPageState extends State<MainSearchPage> {
     final hasLetter = RegExp(r'[a-z]').hasMatch(compact);
     final hasDigit = RegExp(r'\d').hasMatch(compact);
 
-    // Beispiele: EH601HFB1E, D100L, KM6023, 521841
+    // Beispiele: EH601HFB1E, D100L, KM6023, 521841, 5402
     if (hasLetter && hasDigit && compact.length >= 4) return true;
-    if (!hasLetter && hasDigit && compact.length >= 5) return true;
+    if (!hasLetter && hasDigit && compact.length >= minSearchLen) return true;
 
     return false;
   }
@@ -1906,17 +2163,52 @@ class _MainSearchPageState extends State<MainSearchPage> {
     return result.toList();
   }
 
-  Future<List<({String path, int rotation})>> _buildIosOcrImageVariants(
+  Future<({String path, bool isTemporary})> _prepareOcrInputImage(
     String originalPath,
   ) async {
-    // Android bleibt unverändert: nur Originalbild.
-    if (!_isIosOcrMode) {
-      return [(path: originalPath, rotation: 0)];
-    }
+    const maxOcrImageSide = 1800;
 
-    final variants = <({String path, int rotation})>[
-      (path: originalPath, rotation: 0),
-    ];
+    try {
+      final bytes = await File(originalPath).readAsBytes();
+      final decoded = img.decodeImage(bytes);
+
+      if (decoded == null) {
+        return (path: originalPath, isTemporary: false);
+      }
+
+      final longestSide = decoded.width > decoded.height
+          ? decoded.width
+          : decoded.height;
+
+      if (longestSide <= maxOcrImageSide) {
+        return (path: originalPath, isTemporary: false);
+      }
+
+      final scale = maxOcrImageSide / longestSide;
+      final resized = img.copyResize(
+        decoded,
+        width: (decoded.width * scale).round(),
+        height: (decoded.height * scale).round(),
+        interpolation: img.Interpolation.linear,
+      );
+
+      final resizedPath =
+          '${Directory.systemTemp.path}/atool_ocr_resized_${DateTime.now().millisecondsSinceEpoch}.jpg';
+
+      await File(resizedPath).writeAsBytes(img.encodeJpg(resized, quality: 88));
+
+      return (path: resizedPath, isTemporary: true);
+    } catch (e) {
+      debugPrint('OCR RESIZE FAILED: $e');
+      return (path: originalPath, isTemporary: false);
+    }
+  }
+
+  Future<List<({String path, int rotation})>> _buildFallbackOcrImageVariants(
+    String originalPath,
+  ) async {
+    // Etiketten stehen manchmal auf dem Kopf oder seitlich.
+    final variants = <({String path, int rotation})>[];
 
     try {
       final bytes = await File(originalPath).readAsBytes();
@@ -1926,42 +2218,113 @@ class _MainSearchPageState extends State<MainSearchPage> {
         return variants;
       }
 
-      // Wichtigster iOS-Fall: Etikett steht auf dem Kopf.
-      final rotated180 = img.copyRotate(decoded, angle: 180);
-      final rotated180Path =
-          '${Directory.systemTemp.path}/atool_ocr_rotated_180_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      for (final rotation in [180, 90, 270]) {
+        final rotated = img.copyRotate(decoded, angle: rotation);
+        final rotatedPath =
+            '${Directory.systemTemp.path}/atool_ocr_rotated_${rotation}_${DateTime.now().millisecondsSinceEpoch}.jpg';
 
-      await File(
-        rotated180Path,
-      ).writeAsBytes(img.encodeJpg(rotated180, quality: 100));
+        await File(
+          rotatedPath,
+        ).writeAsBytes(img.encodeJpg(rotated, quality: 88));
 
-      variants.add((path: rotated180Path, rotation: 180));
-
-      // Optional, aber hilfreich bei quer fotografierten Etiketten.
-      final rotated90 = img.copyRotate(decoded, angle: 90);
-      final rotated90Path =
-          '${Directory.systemTemp.path}/atool_ocr_rotated_90_${DateTime.now().millisecondsSinceEpoch}.jpg';
-
-      await File(
-        rotated90Path,
-      ).writeAsBytes(img.encodeJpg(rotated90, quality: 100));
-
-      variants.add((path: rotated90Path, rotation: 90));
-
-      final rotated270 = img.copyRotate(decoded, angle: 270);
-      final rotated270Path =
-          '${Directory.systemTemp.path}/atool_ocr_rotated_270_${DateTime.now().millisecondsSinceEpoch}.jpg';
-
-      await File(
-        rotated270Path,
-      ).writeAsBytes(img.encodeJpg(rotated270, quality: 100));
-
-      variants.add((path: rotated270Path, rotation: 270));
+        variants.add((path: rotatedPath, rotation: rotation));
+      }
     } catch (e) {
-      debugPrint('iOS OCR ROTATION FAILED: $e');
+      debugPrint('OCR ROTATION FAILED: $e');
     }
 
     return variants;
+  }
+
+  List<String> _buildDomainOcrCandidates(
+    String rawText,
+    List<OcrBoxCandidate> boxes,
+  ) {
+    final result = <String>[];
+    final sources = <String>[
+      ...rawText.split(RegExp(r'[\r\n]+')),
+      ...boxes.map((e) => e.text),
+    ];
+
+    void add(String value) {
+      final cleaned = _cleanOcrLine(value);
+      if (cleaned.length < minSearchLen) return;
+      if (_isLikelyBarcodeNumber(cleaned)) return;
+      if (!result.contains(cleaned)) result.add(cleaned);
+    }
+
+    String cleanupProductLine(String value) {
+      var s = _cleanOcrLine(value);
+      s = s.replaceAll(
+        RegExp(
+          r'\b(RE|RV|SG|SWZ|CNS|AF|SPULE|SPUEL|SPUL|SINK|EXC|REV|MRU|MB|NERO|PURO)\b',
+          caseSensitive: false,
+        ),
+        ' ',
+      );
+      s = s.replaceAll(RegExp(r'\b\d+\s*1/2"?\b'), ' ');
+      s = s.replaceAll(RegExp(r'\s+'), ' ').trim();
+      return s;
+    }
+
+    for (final source in sources) {
+      final line = _cleanOcrLine(source);
+      if (line.isEmpty) continue;
+
+      final compactLine = line.replaceAll(RegExp(r'\s+'), ' ');
+
+      for (final pattern in [
+        RegExp(
+          r'\b(?:E-NR|E NR|MODEL DESIGNATION|MODEL|MODELLNAME|MODELL|MOD|TYPE|TYP|PRODUCT NO|PRODUCT NR|ARTIKELNR|ARTIKELNUMMER)\b\.?\s*[:\-]?\s*([A-Z0-9][A-Z0-9 ._\/\-]{2,24})',
+          caseSensitive: false,
+        ),
+        RegExp(
+          r'\b(?:V&B\s*-\s*ARTIKELNUMMER|V B\s*-\s*ARTIKELNUMMER)\b\s*([A-Z0-9][A-Z0-9 ._\/\-]{2,24})',
+          caseSensitive: false,
+        ),
+      ]) {
+        final match = pattern.firstMatch(compactLine);
+        final value = match?.group(1);
+        if (value == null) continue;
+
+        final withoutSuffix = value
+            .replaceFirst(RegExp(r'\s*/\s*\d{1,3}\b'), '')
+            .replaceFirst(
+              RegExp(
+                r'\b(FD|Z-NR|TYPE|TYP|SERIAL|SN)\b.*',
+                caseSensitive: false,
+              ),
+              '',
+            )
+            .trim();
+        add(withoutSuffix);
+      }
+
+      final descriptionMatch = RegExp(
+        r'\b(?:BESCHREIBUNG|DESCRIPTION)\b\s*([A-Z]{2,5}\s+\d{2,4}(?:[- ]\d{2,4})?)',
+        caseSensitive: false,
+      ).firstMatch(compactLine);
+      final descriptionCode = descriptionMatch?.group(1);
+      if (descriptionCode != null) add(descriptionCode);
+
+      for (final match in RegExp(
+        r'\b([A-Z][A-Z0-9]{1,5}\s+\d{2,4}(?:[- ]?[A-Z0-9]{1,4}){0,3})\b',
+        caseSensitive: false,
+      ).allMatches(compactLine)) {
+        final value = match.group(1);
+        if (value != null) add(cleanupProductLine(value));
+      }
+
+      for (final match in RegExp(
+        r'\b([A-Z]{2,5}\d{3,6}[A-Z0-9]{0,4})\b',
+        caseSensitive: false,
+      ).allMatches(compactLine)) {
+        final value = match.group(1);
+        if (value != null) add(value);
+      }
+    }
+
+    return result;
   }
 
   List<String> _buildSmartOcrCandidates(
@@ -1988,6 +2351,22 @@ class _MainSearchPageState extends State<MainSearchPage> {
       if (!candidates.contains(cleaned)) {
         candidates.add(cleaned);
       }
+
+      final compact = cleaned.replaceAll(RegExp(r'[^A-Za-z0-9]'), '');
+      if (RegExp(r'(?=.*[A-Za-z])(?=.*\d)').hasMatch(compact)) {
+        final zeroVariant = compact.replaceAll('O', '0').replaceAll('o', '0');
+        final letterVariant = compact.replaceAll('0', 'O');
+
+        for (final variant in [zeroVariant, letterVariant]) {
+          if (variant.length >= minSearchLen && !candidates.contains(variant)) {
+            candidates.add(variant);
+          }
+        }
+      }
+    }
+
+    for (final candidate in _buildDomainOcrCandidates(rawText, boxes)) {
+      addCandidate(candidate);
     }
 
     for (final box in boxes) {
@@ -2198,7 +2577,7 @@ class _MainSearchPageState extends State<MainSearchPage> {
     void addNumber(String value) {
       final cleaned = value.trim();
 
-      if (cleaned.length < 5) return;
+      if (cleaned.length < minSearchLen) return;
 
       final digitsOnly = cleaned.replaceAll(RegExp(r'[^0-9]'), '');
 
@@ -2214,7 +2593,7 @@ class _MainSearchPageState extends State<MainSearchPage> {
 
       void addUnique(String candidate) {
         final c = candidate.trim();
-        if (c.length < 5) return;
+        if (c.length < minSearchLen) return;
 
         if (!numberCandidates.contains(c)) {
           numberCandidates.add(c);
@@ -2225,7 +2604,7 @@ class _MainSearchPageState extends State<MainSearchPage> {
 
       final compact = cleaned.replaceAll(RegExp(r'[^0-9a-zA-Z]'), '');
 
-      if (compact.length >= 5) {
+      if (compact.length >= minSearchLen) {
         addUnique(compact);
 
         if (compact.startsWith('0')) {
@@ -2243,7 +2622,7 @@ class _MainSearchPageState extends State<MainSearchPage> {
     for (final box in boxes) {
       final text = box.text.trim();
 
-      if (RegExp(r'^\d{5,}$').hasMatch(text)) {
+      if (RegExp(r'^\d{4,}$').hasMatch(text)) {
         addNumber(text);
       }
 
@@ -2255,7 +2634,7 @@ class _MainSearchPageState extends State<MainSearchPage> {
     // 2. Danach Zahlen aus dem gesamten OCR-Text ziehen
     final combinedText = [rawText, ...boxes.map((e) => e.text)].join(' ');
 
-    for (final match in RegExp(r'\b\d{5,}\b').allMatches(combinedText)) {
+    for (final match in RegExp(r'\b\d{4,}\b').allMatches(combinedText)) {
       final value = match.group(0);
       if (value != null) {
         addNumber(value);
@@ -2311,7 +2690,7 @@ class _MainSearchPageState extends State<MainSearchPage> {
           ),
         );
 
-        if (results.length >= 3) {
+        if (results.length >= maxOcrResultCount) {
           debugPrint(
             'FAST OCR NUMBER MATCHES: ${results.map((e) => '${e.item.basename} | ${e.usedTerm}').toList()}',
           );
@@ -2355,7 +2734,7 @@ class _MainSearchPageState extends State<MainSearchPage> {
     }
 
     // Kurze/mittlere Materialnummern wie 00235469, 521841 bevorzugen.
-    if (digitsOnly.length >= 5 && digitsOnly.length <= 10) {
+    if (digitsOnly.length >= minSearchLen && digitsOnly.length <= 10) {
       return 2;
     }
 
@@ -2429,7 +2808,7 @@ class _MainSearchPageState extends State<MainSearchPage> {
       uniqueKeys.add(key);
       uniqueMatches.add(match);
 
-      if (uniqueMatches.length >= 3) {
+      if (uniqueMatches.length >= maxOcrResultCount) {
         break;
       }
     }
@@ -2446,16 +2825,121 @@ class _MainSearchPageState extends State<MainSearchPage> {
     return uniqueMatches;
   }
 
+  List<OcrCatalogMatch> _limitUniqueOcrMatches(List<OcrCatalogMatch> matches) {
+    final result = <OcrCatalogMatch>[];
+    final seen = <String>{};
+
+    for (final match in matches) {
+      final key = '${match.item.id}|${match.item.basename}';
+      if (seen.contains(key)) continue;
+
+      seen.add(key);
+      result.add(match);
+
+      if (result.length >= maxOcrResultCount) break;
+    }
+
+    return result;
+  }
+
+  List<List<OcrBoxCandidate>> _buildOcrBoxSearchStages(
+    List<OcrBoxCandidate> boxes,
+  ) {
+    if (boxes.isEmpty) return [];
+
+    final stages = <List<OcrBoxCandidate>>[];
+    final signatures = <String>{};
+    final maxHeight = boxes.first.height;
+
+    void addStage(Iterable<OcrBoxCandidate> source) {
+      final stage = source.where((e) => e.text.trim().isNotEmpty).toList();
+      if (stage.isEmpty) return;
+
+      final signature = stage.map((e) => e.text).join('|');
+      if (signatures.contains(signature)) return;
+
+      signatures.add(signature);
+      stages.add(stage);
+    }
+
+    addStage(boxes.where((box) => box.height >= maxHeight * 0.82).take(4));
+    addStage(boxes.take(4));
+    addStage(boxes.take(8));
+    addStage(boxes.take(12));
+    addStage(boxes.take(20));
+
+    return stages;
+  }
+
+  Future<List<OcrCatalogMatch>> _findStructuredOcrCatalogMatches(
+    String rawText,
+    List<OcrBoxCandidate> sortedBoxes,
+  ) {
+    return _findStructuredOcrCatalogMatchesAsync(rawText, sortedBoxes);
+  }
+
+  Future<List<OcrCatalogMatch>> _findStructuredOcrCatalogMatchesAsync(
+    String rawText,
+    List<OcrBoxCandidate> sortedBoxes,
+  ) async {
+    final stages = _buildOcrBoxSearchStages(sortedBoxes);
+
+    for (int i = 0; i < stages.length; i++) {
+      await Future<void>.delayed(Duration.zero);
+      if (_ocrCancelRequested) return [];
+
+      final stage = stages[i];
+      debugPrint(
+        'OCR SEARCH STAGE ${i + 1}/${stages.length}: ${stage.map((e) => '${e.text} (${e.height.toStringAsFixed(0)})').toList()}',
+      );
+
+      final fastMatches = _findFastNumberOcrMatches('', stage);
+      if (fastMatches.isNotEmpty) {
+        return _limitUniqueOcrMatches(fastMatches);
+      }
+
+      await Future<void>.delayed(Duration.zero);
+      if (_ocrCancelRequested) return [];
+
+      final smartMatches = _findBestSmartOcrCatalogMatches('', stage);
+      if (smartMatches.isNotEmpty) {
+        return _limitUniqueOcrMatches(smartMatches);
+      }
+    }
+
+    await Future<void>.delayed(Duration.zero);
+    if (_ocrCancelRequested) return [];
+
+    final fullFastMatches = _findFastNumberOcrMatches(rawText, sortedBoxes);
+    if (fullFastMatches.isNotEmpty) {
+      return _limitUniqueOcrMatches(fullFastMatches);
+    }
+
+    await Future<void>.delayed(Duration.zero);
+    if (_ocrCancelRequested) return [];
+
+    final fullSmartMatches = _findBestSmartOcrCatalogMatches(
+      rawText,
+      sortedBoxes,
+    );
+
+    return _limitUniqueOcrMatches(fullSmartMatches);
+  }
+
   Future<void> _runLocalOcr(ImageSource source) async {
     try {
       final picker = ImagePicker();
       final XFile? picked = await picker.pickImage(
         source: source,
         imageQuality: _isIosOcrMode ? 100 : 90,
+        maxWidth: 1800,
+        maxHeight: 1800,
       );
 
       if (picked == null) return;
       if (!mounted) return;
+
+      final currentOcrRunId = ++_ocrRunId;
 
       setState(() {
         _searchLoading = true;
@@ -2464,9 +2948,23 @@ class _MainSearchPageState extends State<MainSearchPage> {
         _results = [];
         _showOcrSuggestions = false;
         _activeHighlightTerm = '';
+        _ocrSearchActive = true;
+        _ocrCancelRequested = false;
       });
 
-      final imageVariants = await _buildIosOcrImageVariants(picked.path);
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      if (!mounted || _ocrCancelRequested || currentOcrRunId != _ocrRunId) {
+        return;
+      }
+
+      final preparedImage = await _prepareOcrInputImage(picked.path);
+      final tempOcrPaths = <String>{
+        if (preparedImage.isTemporary) preparedImage.path,
+      };
+      final imageVariants = <({String path, int rotation})>[
+        (path: preparedImage.path, rotation: 0),
+      ];
+      var fallbackRotationsLoaded = false;
 
       List<CatalogItem> bestMatches = [];
       String bestUsedSearchText = '';
@@ -2475,7 +2973,8 @@ class _MainSearchPageState extends State<MainSearchPage> {
       String bestRawText = '';
       int bestRotation = 0;
 
-      for (final variant in imageVariants) {
+      for (int i = 0; i < imageVariants.length; i++) {
+        final variant = imageVariants[i];
         final inputImage = InputImage.fromFilePath(variant.path);
         final textRecognizer = TextRecognizer(
           script: TextRecognitionScript.latin,
@@ -2497,6 +2996,22 @@ class _MainSearchPageState extends State<MainSearchPage> {
             .take(12)
             .toList();
 
+        if (mounted &&
+            currentOcrRunId == _ocrRunId &&
+            visibleBoxTexts.isNotEmpty &&
+            !_ocrCancelRequested) {
+          setState(() {
+            _ocrBoxTexts = visibleBoxTexts;
+            _showOcrSuggestions = true;
+            _message =
+                'OCR liest den Aufkleber. Du kannst unten schon einen Begriff antippen oder abbrechen.';
+          });
+        }
+
+        if (_ocrCancelRequested || currentOcrRunId != _ocrRunId) {
+          break;
+        }
+
         debugPrint('OCR VARIANT ROTATION: ${variant.rotation}');
         debugPrint('OCR RAW TEXT: $rawText');
         debugPrint('OCR PREFERRED ARTICLE: $preferredArticle');
@@ -2508,26 +3023,19 @@ class _MainSearchPageState extends State<MainSearchPage> {
         String usedSearchText = '';
         int smartOcrScore = 0;
 
-        final fastNumberMatches = _findFastNumberOcrMatches(
+        final structuredMatches = await _findStructuredOcrCatalogMatches(
           rawText,
           sortedBoxes,
         );
 
-        if (fastNumberMatches.isNotEmpty) {
-          matches = fastNumberMatches.map((e) => e.item).toList();
-          usedSearchText = fastNumberMatches.first.usedTerm;
-          smartOcrScore = fastNumberMatches.first.score;
-        } else {
-          final smartMatches = _findBestSmartOcrCatalogMatches(
-            rawText,
-            sortedBoxes,
-          );
+        if (_ocrCancelRequested || currentOcrRunId != _ocrRunId) {
+          break;
+        }
 
-          if (smartMatches.isNotEmpty) {
-            matches = smartMatches.map((e) => e.item).toList();
-            usedSearchText = smartMatches.first.usedTerm;
-            smartOcrScore = smartMatches.first.score;
-          }
+        if (structuredMatches.isNotEmpty) {
+          matches = structuredMatches.map((e) => e.item).toList();
+          usedSearchText = structuredMatches.first.usedTerm;
+          smartOcrScore = structuredMatches.first.score;
         }
 
         // Sehr eindeutiger Fallback, falls Preferred-Article-Erkennung
@@ -2539,7 +3047,7 @@ class _MainSearchPageState extends State<MainSearchPage> {
           final found = _localOcrSearch(preferredArticle);
 
           if (found.isNotEmpty) {
-            matches = found.take(3).toList();
+            matches = found.take(maxOcrResultCount).toList();
             usedSearchText = preferredArticle;
             smartOcrScore = 9999;
           }
@@ -2561,27 +3069,54 @@ class _MainSearchPageState extends State<MainSearchPage> {
           bestRotation = variant.rotation;
         }
 
-        // Wenn ein sehr sicherer Treffer gefunden wurde, müssen wir nicht weiter testen.
-        if (bestSmartOcrScore >= 9999) {
+        // Wenn ein Treffer gefunden wurde, sparen wir uns die teuren Rotationen.
+        if (bestMatches.isNotEmpty) {
           break;
+        }
+
+        if (_ocrCancelRequested || currentOcrRunId != _ocrRunId) {
+          break;
+        }
+
+        if (i == imageVariants.length - 1 && !fallbackRotationsLoaded) {
+          final fallbackVariants = await _buildFallbackOcrImageVariants(
+            preparedImage.path,
+          );
+          tempOcrPaths.addAll(fallbackVariants.map((e) => e.path));
+          imageVariants.addAll(fallbackVariants);
+          fallbackRotationsLoaded = true;
         }
       }
 
-      // Temporäre iOS-Rotationsbilder löschen.
-      for (final variant in imageVariants) {
-        if (variant.path != picked.path) {
-          try {
-            final file = File(variant.path);
-            if (await file.exists()) {
-              await file.delete();
-            }
-          } catch (_) {
-            // Nicht kritisch.
+      // Temporaere OCR-Zwischenbilder loeschen.
+      for (final path in tempOcrPaths) {
+        try {
+          final file = File(path);
+          if (await file.exists()) {
+            await file.delete();
           }
+        } catch (_) {
+          // Nicht kritisch.
         }
       }
 
       if (!mounted) return;
+
+      if (currentOcrRunId != _ocrRunId) {
+        return;
+      }
+
+      if (_ocrCancelRequested) {
+        setState(() {
+          _searchLoading = false;
+          _ocrSearchActive = false;
+          _results = [];
+          _showOcrSuggestions = _ocrBoxTexts.isNotEmpty;
+          _message =
+              'OCR-Suche abgebrochen. Wähle einen erkannten Begriff aus der Liste.';
+        });
+        return;
+      }
 
       debugPrint('SMART OCR BEST ROTATION: $bestRotation');
       debugPrint('SMART OCR BEST RAW TEXT: $bestRawText');
@@ -2590,6 +3125,7 @@ class _MainSearchPageState extends State<MainSearchPage> {
       if (bestMatches.isEmpty) {
         setState(() {
           _searchLoading = false;
+          _ocrSearchActive = false;
           _results = [];
           _ocrBoxTexts = bestVisibleBoxTexts;
           _showOcrSuggestions = true;
@@ -2602,9 +3138,10 @@ class _MainSearchPageState extends State<MainSearchPage> {
 
       setState(() {
         _searchLoading = false;
+        _ocrSearchActive = false;
         _results = bestMatches;
         _ocrBoxTexts = bestVisibleBoxTexts;
-        _showOcrSuggestions = false;
+        _showOcrSuggestions = bestVisibleBoxTexts.isNotEmpty;
         _activeHighlightTerm = bestUsedSearchText;
 
         if (bestUsedSearchText.isNotEmpty) {
@@ -2638,6 +3175,7 @@ class _MainSearchPageState extends State<MainSearchPage> {
 
       setState(() {
         _searchLoading = false;
+        _ocrSearchActive = false;
         _message = 'Kamera/OCR fehlgeschlagen.';
       });
     }
@@ -2662,17 +3200,28 @@ class _MainSearchPageState extends State<MainSearchPage> {
     }
   }
 
-  Future<void> _handleSearchDirect(String term) async {
+  Future<void> _handleSearchDirect(
+    String term, {
+    bool preserveOcrSuggestions = false,
+  }) async {
     final q = term.trim();
-    if (q.length < minSearchLen) return;
+    if (q.length < manualSearchLen) return;
 
     setState(() {
+      _ocrRunId++;
       _searchLoading = true;
       _message = '';
-      _showOcrSuggestions = false;
-      _ocrBoxTexts = [];
+      if (!preserveOcrSuggestions) {
+        _showOcrSuggestions = false;
+        _ocrBoxTexts = [];
+      }
       _activeHighlightTerm = q;
+      _ocrSearchActive = false;
+      _ocrCancelRequested = true;
     });
+
+    await Future<void>.delayed(const Duration(milliseconds: 16));
+    if (!mounted) return;
 
     try {
       List<CatalogItem> found = [];
@@ -2731,16 +3280,41 @@ class _MainSearchPageState extends State<MainSearchPage> {
     ).push(MaterialPageRoute(builder: (_) => const InfoLicensePage()));
   }
 
+  void _cancelOcrSearch() {
+    if (!_ocrSearchActive) return;
+
+    setState(() {
+      _ocrRunId++;
+      _ocrCancelRequested = true;
+      _ocrSearchActive = false;
+      _searchLoading = false;
+      _showOcrSuggestions = _ocrBoxTexts.isNotEmpty;
+      _message = _ocrBoxTexts.isNotEmpty
+          ? 'OCR-Suche abgebrochen. Wähle einen erkannten Begriff aus der Liste.'
+          : 'OCR-Suche wird abgebrochen.';
+    });
+  }
+
   Future<void> _applyOcrSuggestion(String term) async {
     final q = term.trim();
     if (q.isEmpty) return;
 
-    _searchController.text = q;
-    _searchController.selection = TextSelection.fromPosition(
-      TextPosition(offset: q.length),
-    );
+    _ocrCancelRequested = true;
+    _ocrRunId++;
+    _setSearchTextSilently(q);
 
-    await _handleSearchDirect(q);
+    if (mounted) {
+      setState(() {
+        _ocrSearchActive = false;
+        _searchLoading = false;
+        _activeHighlightTerm = q;
+        _message = '';
+      });
+    }
+
+    await Future<void>.delayed(const Duration(milliseconds: 80));
+
+    await _handleSearchDirect(q, preserveOcrSuggestions: true);
   }
 
   Future<void> _openImageViewer(String imageUrl, String filename) async {
@@ -2797,7 +3371,8 @@ class _MainSearchPageState extends State<MainSearchPage> {
     }
   }
 
-  Future<bool> _askUseSavedDirectory(String dirLabel) async {
+  // ignore: unused_element
+  Future<bool> _askUseSavedDirectoryLegacy(String dirLabel) async {
     final result = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
@@ -2819,6 +3394,120 @@ class _MainSearchPageState extends State<MainSearchPage> {
     return result ?? false;
   }
 
+  Future<bool?> _askUseSavedDirectory(String dirLabel) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => Dialog(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF2C2C2C),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(
+                      Icons.folder_outlined,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Text(
+                      'Download-Ziel',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Abbrechen',
+                    onPressed: () => Navigator.of(dialogContext).pop(null),
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              const Text(
+                'Gespeicherten Ordner verwenden?',
+                style: TextStyle(
+                  color: Color(0xFF555555),
+                  fontSize: 15,
+                  height: 1.35,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF4F4F4),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.folder_open_outlined,
+                      color: Color(0xFF444444),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        dirLabel,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 18),
+              _downloadActionTile(
+                dialogContext: dialogContext,
+                icon: Icons.check_circle_outline,
+                title: 'Verwenden',
+                subtitle: 'Datei in diesem Ordner speichern',
+                value: true,
+                primary: true,
+              ),
+              const SizedBox(height: 10),
+              _downloadActionTile(
+                dialogContext: dialogContext,
+                icon: Icons.create_new_folder_outlined,
+                title: 'Neuen Ordner w\u00e4hlen',
+                subtitle: 'Ein anderes Speicherziel ausw\u00e4hlen',
+                value: false,
+              ),
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(null),
+                  child: const Text('Abbrechen'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    return result;
+  }
+
   Future<void> _saveBytesToDirectory({
     required Uint8List bytes,
     required String directoryPath,
@@ -2837,8 +3526,181 @@ class _MainSearchPageState extends State<MainSearchPage> {
     await file.writeAsBytes(bytes, flush: true);
   }
 
+  Widget _downloadActionTile({
+    required BuildContext dialogContext,
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required bool value,
+    bool primary = false,
+  }) {
+    final backgroundColor = primary
+        ? const Color(0xFF2C2C2C)
+        : const Color(0xFFF4F4F4);
+    final foregroundColor = primary ? Colors.white : const Color(0xFF222222);
+    final subtitleColor = primary ? Colors.white70 : const Color(0xFF666666);
+
+    return Material(
+      color: backgroundColor,
+      borderRadius: BorderRadius.circular(8),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: () => Navigator.of(dialogContext).pop(value),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: primary ? Colors.white12 : Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(icon, color: foregroundColor),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        color: foregroundColor,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        color: subtitleColor,
+                        fontSize: 13,
+                        height: 1.25,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right, color: subtitleColor),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<bool?> _askDownloadAction() async {
+    return showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => Dialog(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF2C2C2C),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(
+                      Icons.file_download_outlined,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Text(
+                      'Download',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Abbrechen',
+                    onPressed: () => Navigator.of(dialogContext).pop(null),
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              const Text(
+                'Was m\u00f6chtest du mit der Datei machen?',
+                style: TextStyle(
+                  color: Color(0xFF555555),
+                  fontSize: 15,
+                  height: 1.35,
+                ),
+              ),
+              const SizedBox(height: 18),
+              _downloadActionTile(
+                dialogContext: dialogContext,
+                icon: Icons.ios_share_outlined,
+                title: 'Teilen',
+                subtitle: 'An Mail, Drive, OneDrive oder andere Apps senden',
+                value: true,
+                primary: true,
+              ),
+              const SizedBox(height: 10),
+              _downloadActionTile(
+                dialogContext: dialogContext,
+                icon: Icons.save_alt_outlined,
+                title: 'Auf Ger\u00e4t speichern',
+                subtitle: 'In einem Ordner auf diesem Ger\u00e4t ablegen',
+                value: false,
+              ),
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(null),
+                  child: const Text('Abbrechen'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _shareDownloadedBytes({
+    required Uint8List bytes,
+    required String fileName,
+  }) async {
+    final box = context.findRenderObject() as RenderBox?;
+
+    await SharePlus.instance.share(
+      ShareParams(
+        title: fileName,
+        subject: fileName,
+        files: [XFile.fromData(bytes, mimeType: 'application/dxf')],
+        fileNameOverrides: [fileName],
+        sharePositionOrigin: box == null
+            ? null
+            : box.localToGlobal(Offset.zero) & box.size,
+      ),
+    );
+  }
+
   Future<void> _downloadWithTarget(String fileUrl, String filename) async {
     try {
+      final shareFile = await _askDownloadAction();
+
+      if (!mounted || shareFile == null) return;
+
       final response = await http.get(Uri.parse(fileUrl));
 
       if (!mounted) return;
@@ -2854,6 +3716,11 @@ class _MainSearchPageState extends State<MainSearchPage> {
 
       final Uint8List bytes = response.bodyBytes;
       final String saveName = _safeDxfFileName(filename);
+
+      if (shareFile) {
+        await _shareDownloadedBytes(bytes: bytes, fileName: saveName);
+        return;
+      }
 
       String? directoryPath = await DownloadPrefs.getDownloadDir();
       String directoryLabel =
@@ -2883,6 +3750,8 @@ class _MainSearchPageState extends State<MainSearchPage> {
         final reuse = await _askUseSavedDirectory(directoryLabel);
 
         if (!mounted) return;
+
+        if (reuse == null) return;
 
         if (!reuse) {
           final picked = await _pickDownloadDirectory();
@@ -2943,12 +3812,8 @@ class _MainSearchPageState extends State<MainSearchPage> {
     }
   }
 
-  Future<void> _searchPdfOnWeb({
-    required String filename,
-    String? manufacturer,
-  }) async {
+  Future<void> _searchPdfOnWeb({required String filename}) async {
     final raw = filename.trim();
-    final maker = (manufacturer ?? '').trim();
 
     if (raw.isEmpty) {
       if (!mounted) return;
@@ -2967,10 +3832,7 @@ class _MainSearchPageState extends State<MainSearchPage> {
         .toList();
 
     final mainQuery = ['"$raw"', ...parts.map((p) => '"$p"')].join(' OR ');
-
-    final query = maker.isNotEmpty
-        ? '($mainQuery) "$maker" filetype:pdf'
-        : '$mainQuery filetype:pdf';
+    final query = '$mainQuery filetype:pdf';
 
     final uri = Uri.parse(
       'https://www.google.com/search?q=${Uri.encodeQueryComponent(query)}',
@@ -3027,6 +3889,71 @@ class _MainSearchPageState extends State<MainSearchPage> {
     );
   }
 
+  Widget _ocrSuggestionPanel({required double maxHeight}) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFE0E0E0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          InkWell(
+            borderRadius: BorderRadius.circular(8),
+            onTap: () {
+              setState(() {
+                _showOcrSuggestions = !_showOcrSuggestions;
+              });
+            },
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      _results.isEmpty
+                          ? 'OCR-Begriffe anzeigen'
+                          : 'Weitere OCR-Begriffe',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                  Icon(
+                    _showOcrSuggestions ? Icons.expand_less : Icons.expand_more,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (_showOcrSuggestions) ...[
+            const Divider(height: 1),
+            ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: maxHeight),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(12),
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: _ocrBoxTexts.take(12).map((text) {
+                    return ActionChip(
+                      label: Text(text),
+                      onPressed: () => _applyOcrSuggestion(text),
+                    );
+                  }).toList(),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final rawSearch = _searchController.text.trim();
@@ -3034,6 +3961,7 @@ class _MainSearchPageState extends State<MainSearchPage> {
         ? _activeHighlightTerm
         : rawSearch;
     final compactHeight = MediaQuery.sizeOf(context).height < 430;
+    final ocrSuggestionsMaxHeight = MediaQuery.sizeOf(context).height * 0.32;
 
     return Scaffold(
       resizeToAvoidBottomInset: false,
@@ -3086,7 +4014,7 @@ class _MainSearchPageState extends State<MainSearchPage> {
                           onSubmitted: _handleSearchDirect,
                           decoration: InputDecoration(
                             hintText:
-                                'Artikelnummer eingeben (min. $minSearchLen Zeichen)…',
+                                'Artikelnummer eingeben (min. $manualSearchLen Zeichen)…',
                             filled: true,
                             fillColor: Colors.white,
                             contentPadding: const EdgeInsets.symmetric(
@@ -3171,9 +4099,58 @@ class _MainSearchPageState extends State<MainSearchPage> {
                       child: Column(
                         children: [
                           if (_searchLoading)
-                            const Padding(
-                              padding: EdgeInsets.only(bottom: 12),
-                              child: Text('Suche läuft…'),
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: _ocrSearchActive
+                                  ? Container(
+                                      width: double.infinity,
+                                      padding: const EdgeInsets.all(12),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(
+                                          color: const Color(0xFFE0E0E0),
+                                        ),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          const SizedBox(
+                                            width: 20,
+                                            height: 20,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 12),
+                                          const Expanded(
+                                            child: Text(
+                                              'OCR-Suche läuft…',
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                          ),
+                                          ElevatedButton.icon(
+                                            onPressed: _cancelOcrSearch,
+                                            icon: const Icon(
+                                              Icons.stop_circle_outlined,
+                                            ),
+                                            label: const Text('OCR abbrechen'),
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: const Color(
+                                                0xFF2C2C2C,
+                                              ),
+                                              foregroundColor: Colors.white,
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(6),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    )
+                                  : const Text('Suche läuft…'),
                             ),
                           if (_message.isNotEmpty)
                             Padding(
@@ -3189,74 +4166,12 @@ class _MainSearchPageState extends State<MainSearchPage> {
                               ),
                             ),
                           if (_ocrBoxTexts.isNotEmpty && _results.isEmpty)
-                            Container(
-                              width: double.infinity,
-                              margin: const EdgeInsets.only(bottom: 12),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                  color: const Color(0xFFE0E0E0),
-                                ),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  InkWell(
-                                    borderRadius: BorderRadius.circular(8),
-                                    onTap: () {
-                                      setState(() {
-                                        _showOcrSuggestions =
-                                            !_showOcrSuggestions;
-                                      });
-                                    },
-                                    child: Padding(
-                                      padding: const EdgeInsets.all(12),
-                                      child: Row(
-                                        children: [
-                                          const Expanded(
-                                            child: Text(
-                                              'Keine Treffer? OCR-Begriffe anzeigen',
-                                              style: TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: 14,
-                                              ),
-                                            ),
-                                          ),
-                                          Icon(
-                                            _showOcrSuggestions
-                                                ? Icons.expand_less
-                                                : Icons.expand_more,
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                  if (_showOcrSuggestions) ...[
-                                    const Divider(height: 1),
-                                    Padding(
-                                      padding: const EdgeInsets.all(12),
-                                      child: Wrap(
-                                        spacing: 8,
-                                        runSpacing: 8,
-                                        children: _ocrBoxTexts.take(12).map((
-                                          text,
-                                        ) {
-                                          return ActionChip(
-                                            label: Text(text),
-                                            onPressed: () =>
-                                                _applyOcrSuggestion(text),
-                                          );
-                                        }).toList(),
-                                      ),
-                                    ),
-                                  ],
-                                ],
-                              ),
+                            _ocrSuggestionPanel(
+                              maxHeight: ocrSuggestionsMaxHeight,
                             ),
                           if (!_searchLoading &&
                               _results.isEmpty &&
-                              rawSearch.length >= minSearchLen)
+                              rawSearch.length >= manualSearchLen)
                             const Padding(
                               padding: EdgeInsets.only(top: 20),
                               child: Text(
@@ -3269,8 +4184,21 @@ class _MainSearchPageState extends State<MainSearchPage> {
                             ),
                           Expanded(
                             child: ListView.builder(
-                              itemCount: _results.length,
+                              itemCount:
+                                  _results.length +
+                                  (_ocrBoxTexts.isNotEmpty &&
+                                          _results.isNotEmpty
+                                      ? 1
+                                      : 0),
                               itemBuilder: (context, index) {
+                                if (_ocrBoxTexts.isNotEmpty &&
+                                    _results.isNotEmpty &&
+                                    index == _results.length) {
+                                  return _ocrSuggestionPanel(
+                                    maxHeight: ocrSuggestionsMaxHeight,
+                                  );
+                                }
+
                                 final item = _results[index];
                                 final filename = item.basename;
                                 final einbauTyp = item.type;
@@ -3397,7 +4325,6 @@ class _MainSearchPageState extends State<MainSearchPage> {
                                             onPressed: () {
                                               _searchPdfOnWeb(
                                                 filename: filename,
-                                                manufacturer: item.manufacturer,
                                               );
                                             },
                                             icon: const Icon(
