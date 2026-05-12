@@ -1191,7 +1191,7 @@ class _MainSearchPageState extends State<MainSearchPage>
 
   bool get _isIosOcrMode => defaultTargetPlatform == TargetPlatform.iOS;
 
-  bool _pageLoading = true;
+  bool _pageLoading = false;
   bool _countLoading = true;
   bool _searchLoading = false;
   bool _showOcrSuggestions = false;
@@ -1205,6 +1205,7 @@ class _MainSearchPageState extends State<MainSearchPage>
   bool _ignoreSearchControllerChange = false;
   bool _licenseCheckInProgress = false;
   int _manualSearchRunId = 0;
+  int _catalogIndexBuildRunId = 0;
 
   List<CatalogItem> _catalog = [];
   List<CatalogSearchEntry> _catalogSearchIndex = [];
@@ -1252,11 +1253,14 @@ class _MainSearchPageState extends State<MainSearchPage>
   }
 
   Future<void> _initPage() async {
-    final loadedFromCache = await _loadCachedIndex();
+    await _loadCachedIndex().timeout(
+      const Duration(seconds: 2),
+      onTimeout: () => false,
+    );
 
     unawaited(_ensureActiveLicense());
     unawaited(_loadDwgDisplayCount());
-    unawaited(_refreshIndexFromServer(showBlockingLoader: !loadedFromCache));
+    unawaited(_refreshIndexFromServer(showBlockingLoader: false));
   }
 
   Future<bool> _ensureActiveLicense({bool force = false}) async {
@@ -1328,14 +1332,20 @@ class _MainSearchPageState extends State<MainSearchPage>
   }
 
   void _scheduleCatalogSearchIndexRebuild() {
+    final runId = ++_catalogIndexBuildRunId;
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || _catalog.isEmpty) return;
-      _rebuildCatalogSearchIndex();
+      if (runId != _catalogIndexBuildRunId) return;
+
+      unawaited(_rebuildCatalogSearchIndex(runId));
     });
   }
 
-  void _rebuildCatalogSearchIndex() {
+  Future<void> _rebuildCatalogSearchIndex(int runId) async {
     final ocrLookupIndex = <String, List<CatalogItem>>{};
+    final searchEntries = <CatalogSearchEntry>[];
+    final catalogSnapshot = List<CatalogItem>.of(_catalog);
 
     void addOcrLookupKey(CatalogItem item, String key) {
       final trimmed = key.trim();
@@ -1351,7 +1361,10 @@ class _MainSearchPageState extends State<MainSearchPage>
       }
     }
 
-    _catalogSearchIndex = _catalog.map((item) {
+    for (var i = 0; i < catalogSnapshot.length; i++) {
+      if (!mounted || runId != _catalogIndexBuildRunId) return;
+
+      final item = catalogSnapshot[i];
       final rawFields = <String>[
         item.basename,
         item.id,
@@ -1403,18 +1416,27 @@ class _MainSearchPageState extends State<MainSearchPage>
         }
       }
 
-      return CatalogSearchEntry(
-        item: item,
-        searchText: searchText,
-        compactText: compactText,
-        manualSearchText: manualSearchText,
-        manualCompactText: manualCompactText,
-        fieldTexts: fieldTexts,
-        fieldCompacts: fieldCompacts,
-        tokens: tokens,
+      searchEntries.add(
+        CatalogSearchEntry(
+          item: item,
+          searchText: searchText,
+          compactText: compactText,
+          manualSearchText: manualSearchText,
+          manualCompactText: manualCompactText,
+          fieldTexts: fieldTexts,
+          fieldCompacts: fieldCompacts,
+          tokens: tokens,
+        ),
       );
-    }).toList();
 
+      if (i % 150 == 0) {
+        await Future<void>.delayed(Duration.zero);
+      }
+    }
+
+    if (!mounted || runId != _catalogIndexBuildRunId) return;
+
+    _catalogSearchIndex = searchEntries;
     _ocrLookupIndex = ocrLookupIndex;
 
     debugPrint('CATALOG SEARCH INDEX READY: ${_catalogSearchIndex.length}');
@@ -1455,7 +1477,6 @@ class _MainSearchPageState extends State<MainSearchPage>
           .get(Uri.parse(AppConfig.catalogUrl))
           .timeout(const Duration(seconds: 12));
       final items = _parseCatalogItems(resp.body);
-      await CatalogCachePrefs.setCatalogJson(resp.body);
 
       if (!mounted) return;
 
@@ -1463,6 +1484,12 @@ class _MainSearchPageState extends State<MainSearchPage>
         _applyCatalogItems(items);
       });
       _scheduleCatalogSearchIndexRebuild();
+
+      unawaited(
+        CatalogCachePrefs.setCatalogJson(resp.body).catchError((_) {
+          // Cache ist nur Komfort. Die App darf beim Start nicht daran hängen.
+        }),
+      );
     } catch (_) {
       if (!mounted) return;
       setState(() {
