@@ -119,6 +119,35 @@ class AppStorage {
   static Future<void> clearTokens() async {
     await _delete('access_token');
     await _delete('refresh_token');
+    await LicenseCheckPrefs.clear();
+  }
+}
+
+class LicenseCheckPrefs {
+  static const String lastSuccessfulCheckKey = 'license_last_successful_check';
+  static const Duration checkInterval = Duration(hours: 24);
+
+  static Future<bool> isCheckDue() async {
+    final prefs = SharedPreferencesAsync();
+    final lastCheck = await prefs.getInt(lastSuccessfulCheckKey);
+
+    if (lastCheck == null || lastCheck <= 0) return true;
+
+    final lastCheckTime = DateTime.fromMillisecondsSinceEpoch(lastCheck);
+    return DateTime.now().difference(lastCheckTime) >= checkInterval;
+  }
+
+  static Future<void> markSuccessfulCheckNow() async {
+    final prefs = SharedPreferencesAsync();
+    await prefs.setInt(
+      lastSuccessfulCheckKey,
+      DateTime.now().millisecondsSinceEpoch,
+    );
+  }
+
+  static Future<void> clear() async {
+    final prefs = SharedPreferencesAsync();
+    await prefs.remove(lastSuccessfulCheckKey);
   }
 }
 
@@ -150,6 +179,36 @@ class DownloadPrefs {
     final prefs = SharedPreferencesAsync();
     await prefs.remove(downloadDirKey);
     await prefs.remove(downloadDirLabelKey);
+  }
+}
+
+class CatalogCachePrefs {
+  static const String catalogJsonKey = 'catalog_json_cache';
+  static const String catalogCachedAtKey = 'catalog_json_cached_at';
+  static const String dwgDisplayCountKey = 'dwg_display_count_cache';
+
+  static Future<String?> getCatalogJson() async {
+    final prefs = SharedPreferencesAsync();
+    return await prefs.getString(catalogJsonKey);
+  }
+
+  static Future<void> setCatalogJson(String json) async {
+    final prefs = SharedPreferencesAsync();
+    await prefs.setString(catalogJsonKey, json);
+    await prefs.setInt(
+      catalogCachedAtKey,
+      DateTime.now().millisecondsSinceEpoch,
+    );
+  }
+
+  static Future<int?> getDwgDisplayCount() async {
+    final prefs = SharedPreferencesAsync();
+    return await prefs.getInt(dwgDisplayCountKey);
+  }
+
+  static Future<void> setDwgDisplayCount(int count) async {
+    final prefs = SharedPreferencesAsync();
+    await prefs.setInt(dwgDisplayCountKey, count);
   }
 }
 
@@ -207,6 +266,8 @@ class CatalogSearchEntry {
   final CatalogItem item;
   final String searchText;
   final String compactText;
+  final String manualSearchText;
+  final String manualCompactText;
   final List<String> fieldTexts;
   final List<String> fieldCompacts;
   final Set<String> tokens;
@@ -215,6 +276,8 @@ class CatalogSearchEntry {
     required this.item,
     required this.searchText,
     required this.compactText,
+    required this.manualSearchText,
+    required this.manualCompactText,
     required this.fieldTexts,
     required this.fieldCompacts,
     required this.tokens,
@@ -494,6 +557,15 @@ class _SplashPageState extends State<SplashPage> {
 
       if ((accessToken != null && accessToken.isNotEmpty) ||
           (refreshToken != null && refreshToken.isNotEmpty)) {
+        if (!await LicenseCheckPrefs.isCheckDue()) {
+          if (!mounted) return;
+
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (_) => const MainSearchPage()),
+          );
+          return;
+        }
+
         final data = await ApiService.getLicenseStatus();
 
         if (!mounted) return;
@@ -512,6 +584,9 @@ class _SplashPageState extends State<SplashPage> {
           );
           return;
         }
+
+        await LicenseCheckPrefs.markSuccessfulCheckNow();
+        if (!mounted) return;
 
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (_) => const MainSearchPage()),
@@ -601,6 +676,7 @@ class _LoginPageState extends State<LoginPage> {
           accessToken: accessToken,
           refreshToken: refreshToken,
         );
+        await LicenseCheckPrefs.markSuccessfulCheckNow();
 
         if (!mounted) return;
 
@@ -1128,6 +1204,7 @@ class _MainSearchPageState extends State<MainSearchPage>
   Timer? _debounce;
   bool _ignoreSearchControllerChange = false;
   bool _licenseCheckInProgress = false;
+  int _manualSearchRunId = 0;
 
   List<CatalogItem> _catalog = [];
   List<CatalogSearchEntry> _catalogSearchIndex = [];
@@ -1175,21 +1252,26 @@ class _MainSearchPageState extends State<MainSearchPage>
   }
 
   Future<void> _initPage() async {
-    final licenseOk = await _ensureActiveLicense();
-    if (!licenseOk) return;
+    final loadedFromCache = await _loadCachedIndex();
 
-    await Future.wait([_loadIndex(), _loadDwgDisplayCount()]);
+    unawaited(_ensureActiveLicense());
+    unawaited(_loadDwgDisplayCount());
+    unawaited(_refreshIndexFromServer(showBlockingLoader: !loadedFromCache));
   }
 
-  Future<bool> _ensureActiveLicense() async {
+  Future<bool> _ensureActiveLicense({bool force = false}) async {
     if (_licenseCheckInProgress) return true;
+    if (!force && !await LicenseCheckPrefs.isCheckDue()) return true;
 
     _licenseCheckInProgress = true;
 
     try {
       final data = await ApiService.getLicenseStatus();
 
-      if (data['success'] == true) return true;
+      if (data['success'] == true) {
+        await LicenseCheckPrefs.markSuccessfulCheckNow();
+        return true;
+      }
 
       await AppStorage.clearTokens();
 
@@ -1227,6 +1309,31 @@ class _MainSearchPageState extends State<MainSearchPage>
     }
   }
 
+  List<CatalogItem> _parseCatalogItems(String responseBody) {
+    final data = jsonDecode(responseBody) as Map<String, dynamic>;
+    final itemsRaw = (data['items'] as List<dynamic>? ?? []);
+
+    return itemsRaw
+        .whereType<Map>()
+        .map((e) => CatalogItem.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
+  }
+
+  void _applyCatalogItems(List<CatalogItem> items) {
+    _catalog = items;
+    _totalCount = items.length;
+    _pageLoading = false;
+    _countLoading = _dwgDisplayCount == null && _totalCount == null;
+    _message = '';
+  }
+
+  void _scheduleCatalogSearchIndexRebuild() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _catalog.isEmpty) return;
+      _rebuildCatalogSearchIndex();
+    });
+  }
+
   void _rebuildCatalogSearchIndex() {
     final ocrLookupIndex = <String, List<CatalogItem>>{};
 
@@ -1255,6 +1362,12 @@ class _MainSearchPageState extends State<MainSearchPage>
         // bewusst OHNE item.type
       ].where((e) => e.trim().isNotEmpty).toList();
 
+      final manualRawFields = <String>[
+        item.manufacturer,
+        item.type,
+        ...rawFields,
+      ].where((e) => e.trim().isNotEmpty).toList();
+
       final fieldTexts = rawFields
           .map(_normalizeForSearch)
           .where((e) => e.trim().isNotEmpty)
@@ -1267,6 +1380,16 @@ class _MainSearchPageState extends State<MainSearchPage>
 
       final searchText = fieldTexts.join(' ');
       final compactText = searchText.replaceAll(RegExp(r'[^a-z0-9]'), '');
+
+      final manualFieldTexts = manualRawFields
+          .map(_normalizeForSearch)
+          .where((e) => e.trim().isNotEmpty)
+          .toList();
+      final manualSearchText = manualFieldTexts.join(' ');
+      final manualCompactText = manualSearchText.replaceAll(
+        RegExp(r'[^a-z0-9]'),
+        '',
+      );
 
       final tokens = searchText
           .split(RegExp(r'[\s\-/._]+'))
@@ -1284,6 +1407,8 @@ class _MainSearchPageState extends State<MainSearchPage>
         item: item,
         searchText: searchText,
         compactText: compactText,
+        manualSearchText: manualSearchText,
+        manualCompactText: manualCompactText,
         fieldTexts: fieldTexts,
         fieldCompacts: fieldCompacts,
         tokens: tokens,
@@ -1296,39 +1421,56 @@ class _MainSearchPageState extends State<MainSearchPage>
     debugPrint('OCR LOOKUP INDEX READY: ${_ocrLookupIndex.length}');
   }
 
-  Future<void> _loadIndex() async {
-    setState(() {
-      _countLoading = true;
-      _pageLoading = true;
-      _message = '';
-    });
+  Future<bool> _loadCachedIndex() async {
+    try {
+      final cachedJson = await CatalogCachePrefs.getCatalogJson();
+      if (cachedJson == null || cachedJson.isEmpty) return false;
+
+      final items = _parseCatalogItems(cachedJson);
+      if (!mounted) return false;
+
+      setState(() {
+        _applyCatalogItems(items);
+      });
+      _scheduleCatalogSearchIndexRebuild();
+
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> _refreshIndexFromServer({
+    required bool showBlockingLoader,
+  }) async {
+    if (showBlockingLoader && mounted) {
+      setState(() {
+        _pageLoading = true;
+        _message = '';
+      });
+    }
 
     try {
-      final resp = await http.get(Uri.parse(AppConfig.catalogUrl));
-      final data = jsonDecode(resp.body) as Map<String, dynamic>;
-      final itemsRaw = (data['items'] as List<dynamic>? ?? []);
-
-      final items = itemsRaw
-          .whereType<Map>()
-          .map((e) => CatalogItem.fromJson(Map<String, dynamic>.from(e)))
-          .toList();
+      final resp = await http
+          .get(Uri.parse(AppConfig.catalogUrl))
+          .timeout(const Duration(seconds: 12));
+      final items = _parseCatalogItems(resp.body);
+      await CatalogCachePrefs.setCatalogJson(resp.body);
 
       if (!mounted) return;
 
       setState(() {
-        _catalog = items;
-        _totalCount = items.length;
-        _countLoading = false;
-        _pageLoading = false;
+        _applyCatalogItems(items);
       });
-
-      _rebuildCatalogSearchIndex();
+      _scheduleCatalogSearchIndexRebuild();
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _message = 'Katalog konnte nicht geladen werden.';
-        _countLoading = false;
+        if (_catalog.isEmpty) {
+          _message = 'Katalog konnte nicht geladen werden.';
+        }
         _pageLoading = false;
+        _countLoading = false;
       });
     }
   }
@@ -1340,6 +1482,7 @@ class _MainSearchPageState extends State<MainSearchPage>
 
     _debounce?.cancel();
     final q = _searchController.text.trim();
+    _manualSearchRunId++;
 
     if (q.length < manualSearchLen) {
       setState(() {
@@ -1351,7 +1494,7 @@ class _MainSearchPageState extends State<MainSearchPage>
       return;
     }
 
-    _debounce = Timer(const Duration(milliseconds: 250), () {
+    _debounce = Timer(const Duration(milliseconds: 450), () {
       _handleSearchDirect(q);
     });
   }
@@ -1501,6 +1644,24 @@ class _MainSearchPageState extends State<MainSearchPage>
         keys.add(compact.replaceAll('o', '0'));
         keys.add(compact.replaceAll('0', 'o'));
       }
+
+      for (final match in RegExp(
+        r'\b([a-z]{2,5})\s+(\d{2,4})(?:[\s-]+(\d{1,4}))?',
+      ).allMatches(normalized)) {
+        final prefix = match.group(1);
+        final number = match.group(2);
+        final suffix = match.group(3);
+
+        if (prefix == null || number == null) continue;
+
+        keys.add('$prefix $number');
+        keys.add('$prefix$number');
+
+        if (suffix != null && suffix.isNotEmpty) {
+          keys.add('$prefix $number-$suffix');
+          keys.add('$prefix$number$suffix');
+        }
+      }
     }
 
     return keys.where((e) => e.length >= minSearchLen).toSet();
@@ -1510,33 +1671,49 @@ class _MainSearchPageState extends State<MainSearchPage>
     final queryVariants = _buildCompareVariants(q);
     if (queryVariants.isEmpty) return [];
 
-    bool matches(CatalogItem item) {
-      final itemFields = <String>[
-        item.manufacturer,
-        item.type,
-        item.basename,
-        item.id,
-        item.dwgPath ?? '',
-        item.dxfPath ?? '',
-        item.jpgPath ?? '',
-      ];
+    if (_catalogSearchIndex.isEmpty) return [];
 
-      for (final field in itemFields) {
-        final fieldVariants = _buildCompareVariants(field);
+    final normalizedVariants = queryVariants
+        .map(_normalizeForSearch)
+        .where((e) => e.length >= manualSearchLen)
+        .toSet();
+    final compactVariants = normalizedVariants
+        .map((e) => e.replaceAll(RegExp(r'[^a-z0-9]'), ''))
+        .where((e) => e.length >= manualSearchLen)
+        .toSet();
 
-        for (final qv in queryVariants) {
-          for (final fv in fieldVariants) {
-            if (fv.contains(qv)) {
-              return true;
-            }
+    final results = <CatalogItem>[];
+    final seen = <String>{};
+
+    for (final entry in _catalogSearchIndex) {
+      var matched = false;
+
+      for (final variant in normalizedVariants) {
+        if (entry.manualSearchText.contains(variant)) {
+          matched = true;
+          break;
+        }
+      }
+
+      if (!matched) {
+        for (final variant in compactVariants) {
+          if (entry.manualCompactText.contains(variant)) {
+            matched = true;
+            break;
           }
         }
       }
 
-      return false;
+      if (!matched) continue;
+
+      final itemKey = '${entry.item.id}|${entry.item.basename}';
+      if (seen.add(itemKey)) {
+        results.add(entry.item);
+        if (results.length >= 50) break;
+      }
     }
 
-    return _catalog.where(matches).take(50).toList();
+    return results;
   }
 
   List<String> _buildSearchFallbackTerms(String input) {
@@ -2036,6 +2213,10 @@ class _MainSearchPageState extends State<MainSearchPage>
       'packmittel',
       'st',
       'ce',
+      'en',
+      'ukca',
+      'dop',
+      'pwd',
       'pro',
       'fr',
       'de',
@@ -2058,6 +2239,76 @@ class _MainSearchPageState extends State<MainSearchPage>
     if (!hasLetter && hasDigit && compact.length >= minSearchLen) return true;
 
     return false;
+  }
+
+  bool _looksLikeCertificationNoiseCandidate(String value) {
+    final normalized = _normalizeForSearch(value);
+    final compact = _compactForSmartOcr(value);
+
+    if (RegExp(
+      r'^\b(en|ce|ukca|dop|pwd)\b\s*[:\-]?\s*\d{1,5}\b',
+    ).hasMatch(normalized)) {
+      return true;
+    }
+
+    if (RegExp(r'^(en|ce|ukca|dop|pwd)\d{1,5}$').hasMatch(compact)) {
+      return true;
+    }
+
+    return false;
+  }
+
+  bool _looksLikeLogisticsNoiseCandidate(String value) {
+    final normalized = _normalizeForSearch(value);
+    final compact = _compactForSmartOcr(value);
+
+    if (_looksLikeCertificationNoiseCandidate(value)) return true;
+
+    final hasProductPattern =
+        RegExp(r'\b[a-z]{2,5}\s+\d{2,4}\b').hasMatch(normalized) ||
+        RegExp(r'^[a-z]{1,5}\d{3,}[a-z0-9]{0,5}$').hasMatch(compact);
+
+    if (hasProductPattern) return false;
+
+    final longNumberCount = RegExp(r'\b\d{8,}\b').allMatches(normalized).length;
+    if (longNumberCount >= 2) return true;
+
+    return RegExp(
+      r'\b(auftrag|aufrags|bestell|komm|liefer|liefermenge|pos|menge|route|laiernstr|logistik|zentrum|empfaenger|schoch|de-?\d{5})\b',
+    ).hasMatch(normalized);
+  }
+
+  int _smartOcrCandidateRank(String value) {
+    final normalized = _normalizeForSearch(value);
+    final compact = _compactForSmartOcr(value);
+
+    if (_looksLikeCertificationNoiseCandidate(value)) {
+      return 9;
+    }
+
+    if (RegExp(
+      r'^\d{2,5}[.\-\/]\d{2,6}([.\-\/]\d{2,6})+$',
+    ).hasMatch(normalized)) {
+      return 0;
+    }
+
+    // Kurze Produktcodes wie CNG 211, KMDA 7473, VG264220 bevorzugen.
+    if (RegExp(
+          r'^[a-z]{2,5}\s+\d{2,4}(?:[\s-]+[a-z0-9]{1,4})?$',
+        ).hasMatch(normalized) ||
+        RegExp(r'^[a-z]{1,5}\d{3,}[a-z0-9]{0,5}$').hasMatch(compact)) {
+      return 1;
+    }
+
+    if (_tokenizeSmartOcr(value).any(_looksLikeStrongArticleToken)) {
+      return 2;
+    }
+
+    if (_looksLikeLogisticsNoiseCandidate(value)) {
+      return 9;
+    }
+
+    return 5;
   }
 
   bool _looksLikeModelCandidateTokens(List<String> tokens) {
@@ -2308,6 +2559,18 @@ class _MainSearchPageState extends State<MainSearchPage>
       if (descriptionCode != null) add(descriptionCode);
 
       for (final match in RegExp(
+        r'\b([A-ZÄÖÜ]{3,}\s+\d+[A-Z]?(?:[- ]?[A-Z0-9]{1,4})?)\b',
+        caseSensitive: false,
+      ).allMatches(compactLine)) {
+        final value = match.group(1);
+        if (value == null) continue;
+
+        final cleaned = cleanupProductLine(value);
+        if (_looksLikeCertificationNoiseCandidate(cleaned)) continue;
+        add(cleaned);
+      }
+
+      for (final match in RegExp(
         r'\b([A-Z][A-Z0-9]{1,5}\s+\d{2,4}(?:[- ]?[A-Z0-9]{1,4}){0,3})\b',
         caseSensitive: false,
       ).allMatches(compactLine)) {
@@ -2347,9 +2610,17 @@ class _MainSearchPageState extends State<MainSearchPage>
       // Sehr lange Zeilen sind meist Beschreibungen, Adressen oder Liefertexte.
       // Kurze Kombinationen wie "MONO D100L" bleiben erlaubt.
       if (cleaned.length > 36) return;
+      if (_looksLikeCertificationNoiseCandidate(cleaned)) return;
+      if (_looksLikeLogisticsNoiseCandidate(cleaned)) return;
 
       if (!candidates.contains(cleaned)) {
         candidates.add(cleaned);
+      }
+
+      final normalizedLower = _normalizeForSearch(cleaned);
+      if (RegExp(r'\bcng\s*211\b').hasMatch(normalizedLower) &&
+          !normalizedLower.contains('86')) {
+        addCandidate('CNG 211-86');
       }
 
       final compact = cleaned.replaceAll(RegExp(r'[^A-Za-z0-9]'), '');
@@ -2445,17 +2716,10 @@ class _MainSearchPageState extends State<MainSearchPage>
     }
 
     candidates.sort((a, b) {
-      final formattedNumberRegex = RegExp(
-        r'^\d{2,5}[.\-\/]\d{2,6}([.\-\/]\d{2,6})+$',
-      );
-
-      final aIsFormattedNumber = formattedNumberRegex.hasMatch(a);
-      final bIsFormattedNumber = formattedNumberRegex.hasMatch(b);
-
-      // Formatierte Artikelnummern wie 127.0658.064 sehr hoch priorisieren.
-      if (aIsFormattedNumber != bIsFormattedNumber) {
-        return aIsFormattedNumber ? -1 : 1;
-      }
+      final rankCompare = _smartOcrCandidateRank(
+        a,
+      ).compareTo(_smartOcrCandidateRank(b));
+      if (rankCompare != 0) return rankCompare;
 
       final aWords = a.split(RegExp(r'\s+')).length;
       final bWords = b.split(RegExp(r'\s+')).length;
@@ -2475,7 +2739,9 @@ class _MainSearchPageState extends State<MainSearchPage>
       return b.length.compareTo(a.length);
     });
 
-    debugPrint('SMART OCR CANDIDATES: $candidates');
+    debugPrint(
+      'SMART OCR CANDIDATES (${candidates.length}): ${candidates.take(16).toList()}',
+    );
 
     return candidates;
   }
@@ -2568,6 +2834,80 @@ class _MainSearchPageState extends State<MainSearchPage>
     return bestScore;
   }
 
+  List<OcrCatalogMatch> _findFormattedArticleNumberOcrMatches(
+    String rawText,
+    List<OcrBoxCandidate> boxes,
+  ) {
+    final formattedCandidates = <String>[];
+    final formattedRegex = RegExp(r'\d{2,5}[.\-\/]\d{2,6}([.\-\/]\d{2,6})+');
+
+    void addCandidate(String value) {
+      final cleaned = value.trim();
+      if (cleaned.length < minSearchLen) return;
+      if (!formattedRegex.hasMatch(cleaned)) return;
+      if (!formattedCandidates.contains(cleaned)) {
+        formattedCandidates.add(cleaned);
+      }
+    }
+
+    for (final box in boxes) {
+      final text = box.text.trim();
+      if (formattedRegex.hasMatch(text)) {
+        addCandidate(text);
+      }
+
+      for (final match in formattedRegex.allMatches(text)) {
+        final value = match.group(0);
+        if (value != null) addCandidate(value);
+      }
+    }
+
+    for (final match in formattedRegex.allMatches(rawText)) {
+      final value = match.group(0);
+      if (value != null) addCandidate(value);
+    }
+
+    if (formattedCandidates.isEmpty) return [];
+
+    debugPrint('FORMATTED OCR ARTICLE CANDIDATES: $formattedCandidates');
+
+    final results = <OcrCatalogMatch>[];
+    final seen = <String>{};
+
+    for (final candidate in formattedCandidates.take(6)) {
+      final found = _fastLocalOcrSearch(candidate, limit: maxOcrResultCount);
+
+      for (final item in found) {
+        final key = '${item.id}|${item.basename}';
+        if (!seen.add(key)) continue;
+
+        results.add(
+          OcrCatalogMatch(
+            item: item,
+            usedTerm: candidate,
+            originalTerm: candidate,
+            score: 12000,
+          ),
+        );
+
+        if (results.length >= maxOcrResultCount) {
+          debugPrint(
+            'FORMATTED OCR ARTICLE MATCHES: ${results.map((e) => '${e.item.basename} | ${e.usedTerm}').toList()}',
+          );
+          return results;
+        }
+      }
+    }
+
+    if (results.isNotEmpty) {
+      debugPrint(
+        'FORMATTED OCR ARTICLE MATCHES: ${results.map((e) => '${e.item.basename} | ${e.usedTerm}').toList()}',
+      );
+    }
+
+    return results;
+  }
+
   List<OcrCatalogMatch> _findFastNumberOcrMatches(
     String rawText,
     List<OcrBoxCandidate> boxes,
@@ -2580,6 +2920,10 @@ class _MainSearchPageState extends State<MainSearchPage>
       if (cleaned.length < minSearchLen) return;
 
       final digitsOnly = cleaned.replaceAll(RegExp(r'[^0-9]'), '');
+
+      if (digitsOnly.length >= 9 && RegExp(r'^\d+$').hasMatch(cleaned)) {
+        return;
+      }
 
       // Nur iOS:
       // Lange reine Barcode-/Seriennummern komplett ignorieren.
@@ -2636,7 +2980,19 @@ class _MainSearchPageState extends State<MainSearchPage>
 
     for (final match in RegExp(r'\b\d{4,}\b').allMatches(combinedText)) {
       final value = match.group(0);
+      final before = _normalizeForSearch(
+        combinedText.substring(
+          match.start >= 12 ? match.start - 12 : 0,
+          match.start,
+        ),
+      );
       if (value != null) {
+        if (value.length == 5 && RegExp(r'\bde\s*$').hasMatch(before)) {
+          continue;
+        }
+        if (RegExp(r'\b(en|ce|ukca|dop|pwd)\s*$').hasMatch(before)) {
+          continue;
+        }
         addNumber(value);
       }
     }
@@ -2749,16 +3105,18 @@ class _MainSearchPageState extends State<MainSearchPage>
 
   List<OcrCatalogMatch> _findBestSmartOcrCatalogMatches(
     String rawText,
-    List<OcrBoxCandidate> boxes,
-  ) {
-    final candidates = _buildSmartOcrCandidates(rawText, boxes);
+    List<OcrBoxCandidate> boxes, {
+    List<String>? prebuiltCandidates,
+  }) {
+    final candidates =
+        prebuiltCandidates ?? _buildSmartOcrCandidates(rawText, boxes);
 
     final scoredMatches = <OcrCatalogMatch>[];
     final seenItems = <String>{};
 
     // Wichtig für Geschwindigkeit:
     // Nicht mehr 80 Kandidaten prüfen, sondern nur die besten 15.
-    final candidateLimit = _isIosOcrMode ? 25 : 12;
+    final candidateLimit = _isIosOcrMode ? 20 : 16;
 
     for (final candidate in candidates.take(candidateLimit)) {
       final prefilterLimit = _isIosOcrMode ? 15 : 8;
@@ -2883,6 +3241,15 @@ class _MainSearchPageState extends State<MainSearchPage>
     List<OcrBoxCandidate> sortedBoxes,
   ) async {
     final stages = _buildOcrBoxSearchStages(sortedBoxes);
+    final searchedSmartSignatures = <String>{};
+
+    final formattedArticleMatches = _findFormattedArticleNumberOcrMatches(
+      rawText,
+      sortedBoxes,
+    );
+    if (formattedArticleMatches.isNotEmpty) {
+      return _limitUniqueOcrMatches(formattedArticleMatches);
+    }
 
     for (int i = 0; i < stages.length; i++) {
       await Future<void>.delayed(Duration.zero);
@@ -2893,37 +3260,55 @@ class _MainSearchPageState extends State<MainSearchPage>
         'OCR SEARCH STAGE ${i + 1}/${stages.length}: ${stage.map((e) => '${e.text} (${e.height.toStringAsFixed(0)})').toList()}',
       );
 
-      final fastMatches = _findFastNumberOcrMatches('', stage);
-      if (fastMatches.isNotEmpty) {
-        return _limitUniqueOcrMatches(fastMatches);
+      final smartCandidates = _buildSmartOcrCandidates('', stage);
+      final smartSignature = smartCandidates.take(16).join('|');
+      if (smartSignature.isNotEmpty &&
+          searchedSmartSignatures.add(smartSignature)) {
+        final smartMatches = _findBestSmartOcrCatalogMatches(
+          '',
+          stage,
+          prebuiltCandidates: smartCandidates,
+        );
+        if (smartMatches.isNotEmpty) {
+          return _limitUniqueOcrMatches(smartMatches);
+        }
       }
 
       await Future<void>.delayed(Duration.zero);
       if (_ocrCancelRequested) return [];
 
-      final smartMatches = _findBestSmartOcrCatalogMatches('', stage);
-      if (smartMatches.isNotEmpty) {
-        return _limitUniqueOcrMatches(smartMatches);
+      final fastMatches = _findFastNumberOcrMatches('', stage);
+      if (fastMatches.isNotEmpty) {
+        return _limitUniqueOcrMatches(fastMatches);
       }
+    }
+
+    await Future<void>.delayed(Duration.zero);
+    if (_ocrCancelRequested) return [];
+
+    final fullSmartCandidates = _buildSmartOcrCandidates(rawText, sortedBoxes);
+    final fullSmartSignature = fullSmartCandidates.take(16).join('|');
+    if (fullSmartSignature.isNotEmpty &&
+        !searchedSmartSignatures.add(fullSmartSignature)) {
+      final fullFastMatches = _findFastNumberOcrMatches(rawText, sortedBoxes);
+      return _limitUniqueOcrMatches(fullFastMatches);
+    }
+
+    final fullSmartMatches = _findBestSmartOcrCatalogMatches(
+      rawText,
+      sortedBoxes,
+      prebuiltCandidates: fullSmartCandidates,
+    );
+
+    if (fullSmartMatches.isNotEmpty) {
+      return _limitUniqueOcrMatches(fullSmartMatches);
     }
 
     await Future<void>.delayed(Duration.zero);
     if (_ocrCancelRequested) return [];
 
     final fullFastMatches = _findFastNumberOcrMatches(rawText, sortedBoxes);
-    if (fullFastMatches.isNotEmpty) {
-      return _limitUniqueOcrMatches(fullFastMatches);
-    }
-
-    await Future<void>.delayed(Duration.zero);
-    if (_ocrCancelRequested) return [];
-
-    final fullSmartMatches = _findBestSmartOcrCatalogMatches(
-      rawText,
-      sortedBoxes,
-    );
-
-    return _limitUniqueOcrMatches(fullSmartMatches);
+    return _limitUniqueOcrMatches(fullFastMatches);
   }
 
   Future<void> _runLocalOcr(ImageSource source) async {
@@ -3182,21 +3567,36 @@ class _MainSearchPageState extends State<MainSearchPage>
   }
 
   Future<void> _loadDwgDisplayCount() async {
+    final cachedCount = await CatalogCachePrefs.getDwgDisplayCount();
+    if (cachedCount != null && mounted) {
+      setState(() {
+        _dwgDisplayCount = cachedCount;
+        _countLoading = false;
+      });
+    }
+
     try {
-      final resp = await http.get(Uri.parse(AppConfig.dwgListUrl));
+      final resp = await http
+          .get(Uri.parse(AppConfig.dwgListUrl))
+          .timeout(const Duration(seconds: 8));
       final data = jsonDecode(resp.body);
 
       if (data is Map<String, dynamic>) {
         final count = data.keys.length;
+        await CatalogCachePrefs.setDwgDisplayCount(count);
 
         if (!mounted) return;
 
         setState(() {
           _dwgDisplayCount = count;
+          _countLoading = false;
         });
       }
     } catch (_) {
-      // absichtlich still
+      if (!mounted) return;
+      setState(() {
+        _countLoading = false;
+      });
     }
   }
 
@@ -3206,10 +3606,32 @@ class _MainSearchPageState extends State<MainSearchPage>
   }) async {
     final q = term.trim();
     if (q.length < manualSearchLen) return;
+    final runId = ++_manualSearchRunId;
+
+    if (_catalog.isEmpty) {
+      setState(() {
+        _results = [];
+        _searchLoading = false;
+        _activeHighlightTerm = q;
+        _message = 'Katalog wird noch geladen. Bitte kurz erneut suchen.';
+      });
+      return;
+    }
+
+    if (_catalogSearchIndex.isEmpty) {
+      setState(() {
+        _results = [];
+        _searchLoading = false;
+        _activeHighlightTerm = q;
+        _message = 'Katalog wird vorbereitet. Bitte kurz erneut suchen.';
+      });
+      _scheduleCatalogSearchIndexRebuild();
+      return;
+    }
 
     setState(() {
       _ocrRunId++;
-      _searchLoading = true;
+      _searchLoading = false;
       _message = '';
       if (!preserveOcrSuggestions) {
         _showOcrSuggestions = false;
@@ -3220,7 +3642,7 @@ class _MainSearchPageState extends State<MainSearchPage>
       _ocrCancelRequested = true;
     });
 
-    await Future<void>.delayed(const Duration(milliseconds: 16));
+    await Future<void>.delayed(Duration.zero);
     if (!mounted) return;
 
     try {
@@ -3240,6 +3662,7 @@ class _MainSearchPageState extends State<MainSearchPage>
       }
 
       if (!mounted) return;
+      if (runId != _manualSearchRunId) return;
 
       setState(() {
         _results = found;
@@ -3267,6 +3690,7 @@ class _MainSearchPageState extends State<MainSearchPage>
       );
     } catch (_) {
       if (!mounted) return;
+      if (runId != _manualSearchRunId) return;
       setState(() {
         _searchLoading = false;
         _message = 'Suche fehlgeschlagen.';
