@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart'
-    show kIsWeb, defaultTargetPlatform, TargetPlatform;
+    show compute, kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'dart:io';
 import 'package:image/image.dart' as img;
 import 'package:url_launcher/url_launcher.dart';
@@ -20,6 +20,8 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:uuid/uuid.dart';
+
+import 'dxf_layer_processor.dart';
 
 void main() {
   runApp(const AToolApp());
@@ -54,6 +56,8 @@ class AppConfig {
   static const String mediaBaseUrl =
       'https://adler-aufmasse.de/wp-content/Adler/';
   static const String ocrUrl = 'https://adler-aufmasse.de/wp-json/adler/v1/ocr';
+  static const String privacyPolicyUrl =
+      'https://adler-aufmasse.de/datenschutz/';
 }
 
 bool get selfRegistrationAvailable => !kIsWeb && !Platform.isIOS;
@@ -182,6 +186,99 @@ class DownloadPrefs {
   }
 }
 
+class DxfLayerPrefs {
+  static const String enabledKey = 'dxf_layer_processing_enabled';
+  static const String falzLayerKey = 'dxf_ausschnitt_falz_layer';
+  static const String gesaegtLayerKey = 'dxf_ausschnitt_gesaegt_layer';
+  static const String auflageLayerKey = 'dxf_ausschnitt_auflage_layer';
+  static const String unterbauLayerKey = 'dxf_ausschnitt_unterbau_layer';
+  static const String bohrungLayerKey = 'dxf_ausschnitt_bohrung_layer';
+  static const String konstruktionLayerKey =
+      'dxf_ausschnitt_konstruktion_layer';
+  static const String falzColorKey = 'dxf_ausschnitt_falz_color';
+  static const String gesaegtColorKey = 'dxf_ausschnitt_gesaegt_color';
+  static const String auflageColorKey = 'dxf_ausschnitt_auflage_color';
+  static const String unterbauColorKey = 'dxf_ausschnitt_unterbau_color';
+  static const String bohrungColorKey = 'dxf_ausschnitt_bohrung_color';
+  static const String konstruktionColorKey =
+      'dxf_ausschnitt_konstruktion_color';
+  static const String defaultFalzLayer = 'AUSSCHNITT_Falz';
+  static const String defaultGesaegtLayer = 'AUSSCHNITT_gesaegt';
+  static const String defaultAuflageLayer = 'AUSSCHNITT_Auflage';
+  static const String defaultUnterbauLayer = 'AUSSCHNITT_Unterbau';
+  static const String defaultBohrungLayer = 'AUSSCHNITT_Bohrung';
+  static const String defaultKonstruktionLayer = 'Konstruktion';
+  static const int defaultLayerColor = 7;
+
+  static Future<DxfLayerSettings> getSettings() async {
+    final prefs = SharedPreferencesAsync();
+    final enabled = await prefs.getBool(enabledKey);
+    final falzLayer = await prefs.getString(falzLayerKey);
+    final gesaegtLayer = await prefs.getString(gesaegtLayerKey);
+    final auflageLayer = await prefs.getString(auflageLayerKey);
+    final unterbauLayer = await prefs.getString(unterbauLayerKey);
+    final bohrungLayer = await prefs.getString(bohrungLayerKey);
+    final konstruktionLayer = await prefs.getString(konstruktionLayerKey);
+
+    return DxfLayerSettings(
+      enabled: enabled ?? true,
+      falzLayer: _cleanLayerName(falzLayer, defaultFalzLayer),
+      gesaegtLayer: _cleanLayerName(gesaegtLayer, defaultGesaegtLayer),
+      auflageLayer: _cleanLayerName(auflageLayer, defaultAuflageLayer),
+      unterbauLayer: _cleanLayerName(unterbauLayer, defaultUnterbauLayer),
+      bohrungLayer: _cleanLayerName(bohrungLayer, defaultBohrungLayer),
+      konstruktionLayer: _cleanLayerName(
+        konstruktionLayer,
+        defaultKonstruktionLayer,
+      ),
+      falzColor: await _getColor(prefs, falzColorKey),
+      gesaegtColor: await _getColor(prefs, gesaegtColorKey),
+      auflageColor: await _getColor(prefs, auflageColorKey),
+      unterbauColor: await _getColor(prefs, unterbauColorKey),
+      bohrungColor: await _getColor(prefs, bohrungColorKey),
+      konstruktionColor: await _getColor(prefs, konstruktionColorKey),
+    );
+  }
+
+  static Future<void> setSettings(DxfLayerSettings settings) async {
+    final prefs = SharedPreferencesAsync();
+    await prefs.setBool(enabledKey, settings.enabled);
+    await prefs.setString(falzLayerKey, settings.falzLayer.trim());
+    await prefs.setString(gesaegtLayerKey, settings.gesaegtLayer.trim());
+    await prefs.setString(auflageLayerKey, settings.auflageLayer.trim());
+    await prefs.setString(unterbauLayerKey, settings.unterbauLayer.trim());
+    await prefs.setString(bohrungLayerKey, settings.bohrungLayer.trim());
+    await prefs.setString(
+      konstruktionLayerKey,
+      settings.konstruktionLayer.trim(),
+    );
+    await prefs.setInt(falzColorKey, settings.falzColor);
+    await prefs.setInt(gesaegtColorKey, settings.gesaegtColor);
+    await prefs.setInt(auflageColorKey, settings.auflageColor);
+    await prefs.setInt(unterbauColorKey, settings.unterbauColor);
+    await prefs.setInt(bohrungColorKey, settings.bohrungColor);
+    await prefs.setInt(konstruktionColorKey, settings.konstruktionColor);
+  }
+
+  static String _cleanLayerName(String? value, String fallback) {
+    final cleanValue = value?.trim() ?? '';
+    if (cleanValue.isEmpty) return fallback;
+    return cleanValue.replaceAll(RegExp(r'\s+'), '_');
+  }
+
+  static Future<int> _getColor(SharedPreferencesAsync prefs, String key) async {
+    final color = await prefs.getInt(key);
+    return _cleanColor(color);
+  }
+
+  static int _cleanColor(int? value) {
+    if (value == null) return defaultLayerColor;
+    if (value < 1) return 1;
+    if (value > 255) return 255;
+    return value;
+  }
+}
+
 class CatalogCachePrefs {
   static const String catalogJsonKey = 'catalog_json_cache';
   static const String catalogCachedAtKey = 'catalog_json_cached_at';
@@ -262,6 +359,30 @@ class CatalogItem {
       dwgPath != null ? '${AppConfig.mediaBaseUrl}$dwgPath' : null;
 }
 
+List<CatalogItem> _parseCatalogItemsInBackground(String responseBody) {
+  final data = jsonDecode(responseBody) as Map<String, dynamic>;
+  final itemsRaw = (data['items'] as List<dynamic>? ?? []);
+
+  return itemsRaw
+      .whereType<Map>()
+      .map((e) => CatalogItem.fromJson(Map<String, dynamic>.from(e)))
+      .toList();
+}
+
+int? _parseDwgDisplayCountInBackground(String responseBody) {
+  final data = jsonDecode(responseBody);
+
+  if (data is Map<String, dynamic>) {
+    final items = data['items'];
+    if (items is List) return items.length;
+    return data.keys.length;
+  }
+
+  if (data is List) return data.length;
+
+  return null;
+}
+
 class CatalogSearchEntry {
   final CatalogItem item;
   final String searchText;
@@ -282,6 +403,137 @@ class CatalogSearchEntry {
     required this.fieldCompacts,
     required this.tokens,
   });
+}
+
+class _CatalogIndexBuildResult {
+  final List<CatalogSearchEntry> searchEntries;
+  final Map<String, List<CatalogItem>> ocrLookupIndex;
+
+  const _CatalogIndexBuildResult({
+    required this.searchEntries,
+    required this.ocrLookupIndex,
+  });
+}
+
+_CatalogIndexBuildResult _buildCatalogSearchIndexInBackground(
+  List<CatalogItem> catalog,
+) {
+  const minSearchLen = 4;
+  final searchEntries = <CatalogSearchEntry>[];
+  final ocrLookupIndex = <String, List<CatalogItem>>{};
+
+  void addOcrLookupKey(CatalogItem item, String key) {
+    final trimmed = key.trim();
+    if (trimmed.length < minSearchLen) return;
+    if (RegExp(r'^\d{12,}$').hasMatch(trimmed)) return;
+
+    final bucket = ocrLookupIndex.putIfAbsent(trimmed, () => []);
+    final itemKey = '${item.id}|${item.basename}';
+    if (!bucket.any(
+      (existing) => '${existing.id}|${existing.basename}' == itemKey,
+    )) {
+      bucket.add(item);
+    }
+  }
+
+  for (final item in catalog) {
+    final rawFields = <String>[
+      item.basename,
+      item.id,
+      item.dwgPath ?? '',
+      item.dxfPath ?? '',
+      item.jpgPath ?? '',
+    ].where((e) => e.trim().isNotEmpty).toList();
+
+    final manualRawFields = <String>[
+      item.manufacturer,
+      item.type,
+      ...rawFields,
+    ].where((e) => e.trim().isNotEmpty).toList();
+
+    final fieldTexts = rawFields
+        .map(_normalizeCatalogSearchText)
+        .where((e) => e.trim().isNotEmpty)
+        .toList();
+
+    final fieldCompacts = fieldTexts
+        .map((e) => e.replaceAll(RegExp(r'[^a-z0-9]'), ''))
+        .where((e) => e.length >= minSearchLen)
+        .toList();
+
+    final searchText = fieldTexts.join(' ');
+    final compactText = searchText.replaceAll(RegExp(r'[^a-z0-9]'), '');
+
+    final manualFieldTexts = manualRawFields
+        .map(_normalizeCatalogSearchText)
+        .where((e) => e.trim().isNotEmpty)
+        .toList();
+    final manualSearchText = manualFieldTexts.join(' ');
+    final manualCompactText = manualSearchText.replaceAll(
+      RegExp(r'[^a-z0-9]'),
+      '',
+    );
+
+    final tokens = searchText
+        .split(RegExp(r'[\s\-/._]+'))
+        .map((e) => e.trim())
+        .where((e) => e.length >= 2)
+        .toSet();
+
+    for (final value in {
+      ...manualFieldTexts,
+      ...fieldCompacts,
+      manualCompactText,
+      compactText,
+    }) {
+      addOcrLookupKey(item, value);
+    }
+
+    searchEntries.add(
+      CatalogSearchEntry(
+        item: item,
+        searchText: searchText,
+        compactText: compactText,
+        manualSearchText: manualSearchText,
+        manualCompactText: manualCompactText,
+        fieldTexts: fieldTexts,
+        fieldCompacts: fieldCompacts,
+        tokens: tokens,
+      ),
+    );
+  }
+
+  return _CatalogIndexBuildResult(
+    searchEntries: searchEntries,
+    ocrLookupIndex: ocrLookupIndex,
+  );
+}
+
+String _normalizeCatalogSearchText(String input) {
+  var s = input.toLowerCase().trim();
+
+  const replacements = {'ä': 'a', 'ö': 'o', 'ü': 'u', 'ß': 'ss'};
+
+  replacements.forEach((key, value) {
+    s = s.replaceAll(key, value);
+  });
+
+  s = s.replaceAll(RegExp(r'[^a-z0-9/_. -]'), '');
+  s = s.replaceAll(RegExp(r'\s+'), ' ').trim();
+
+  final parts = s
+      .split(' ')
+      .map((part) {
+        if (RegExp(r'^0+\d+$').hasMatch(part)) {
+          return part.replaceFirst(RegExp(r'^0+'), '');
+        }
+
+        return part;
+      })
+      .where((e) => e.isNotEmpty)
+      .toList();
+
+  return parts.join(' ');
 }
 
 class DeviceMeta {
@@ -1201,7 +1453,9 @@ class _MainSearchPageState extends State<MainSearchPage>
 
   String _message = '';
   final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode(canRequestFocus: false);
   Timer? _debounce;
+  Timer? _startupFocusGuardTimer;
   bool _ignoreSearchControllerChange = false;
   bool _licenseCheckInProgress = false;
   int _manualSearchRunId = 0;
@@ -1222,13 +1476,23 @@ class _MainSearchPageState extends State<MainSearchPage>
     WidgetsBinding.instance.addObserver(this);
     _initPage();
     _searchController.addListener(_onSearchChanged);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      FocusManager.instance.primaryFocus?.unfocus();
+      _startupFocusGuardTimer = Timer(const Duration(milliseconds: 900), () {
+        if (!mounted) return;
+        _searchFocusNode.canRequestFocus = true;
+      });
+    });
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _debounce?.cancel();
+    _startupFocusGuardTimer?.cancel();
     _searchController.dispose();
+    _searchFocusNode.dispose();
     super.dispose();
   }
 
@@ -1253,13 +1517,17 @@ class _MainSearchPageState extends State<MainSearchPage>
   }
 
   Future<void> _initPage() async {
+    unawaited(_ensureActiveLicense());
+    unawaited(_loadDwgDisplayCount());
+    unawaited(_loadInitialCatalog());
+  }
+
+  Future<void> _loadInitialCatalog() async {
     await _loadCachedIndex().timeout(
       const Duration(seconds: 2),
       onTimeout: () => false,
     );
 
-    unawaited(_ensureActiveLicense());
-    unawaited(_loadDwgDisplayCount());
     unawaited(_refreshIndexFromServer(showBlockingLoader: false));
   }
 
@@ -1313,14 +1581,8 @@ class _MainSearchPageState extends State<MainSearchPage>
     }
   }
 
-  List<CatalogItem> _parseCatalogItems(String responseBody) {
-    final data = jsonDecode(responseBody) as Map<String, dynamic>;
-    final itemsRaw = (data['items'] as List<dynamic>? ?? []);
-
-    return itemsRaw
-        .whereType<Map>()
-        .map((e) => CatalogItem.fromJson(Map<String, dynamic>.from(e)))
-        .toList();
+  Future<List<CatalogItem>> _parseCatalogItems(String responseBody) {
+    return compute(_parseCatalogItemsInBackground, responseBody);
   }
 
   void _applyCatalogItems(List<CatalogItem> items) {
@@ -1343,101 +1605,16 @@ class _MainSearchPageState extends State<MainSearchPage>
   }
 
   Future<void> _rebuildCatalogSearchIndex(int runId) async {
-    final ocrLookupIndex = <String, List<CatalogItem>>{};
-    final searchEntries = <CatalogSearchEntry>[];
     final catalogSnapshot = List<CatalogItem>.of(_catalog);
-
-    void addOcrLookupKey(CatalogItem item, String key) {
-      final trimmed = key.trim();
-      if (trimmed.length < minSearchLen) return;
-      if (_isLikelyBarcodeNumber(trimmed)) return;
-
-      final bucket = ocrLookupIndex.putIfAbsent(trimmed, () => []);
-      final itemKey = '${item.id}|${item.basename}';
-      if (!bucket.any(
-        (existing) => '${existing.id}|${existing.basename}' == itemKey,
-      )) {
-        bucket.add(item);
-      }
-    }
-
-    for (var i = 0; i < catalogSnapshot.length; i++) {
-      if (!mounted || runId != _catalogIndexBuildRunId) return;
-
-      final item = catalogSnapshot[i];
-      final rawFields = <String>[
-        item.basename,
-        item.id,
-        item.dwgPath ?? '',
-        item.dxfPath ?? '',
-        item.jpgPath ?? '',
-        // bewusst OHNE item.manufacturer
-        // bewusst OHNE item.type
-      ].where((e) => e.trim().isNotEmpty).toList();
-
-      final manualRawFields = <String>[
-        item.manufacturer,
-        item.type,
-        ...rawFields,
-      ].where((e) => e.trim().isNotEmpty).toList();
-
-      final fieldTexts = rawFields
-          .map(_normalizeForSearch)
-          .where((e) => e.trim().isNotEmpty)
-          .toList();
-
-      final fieldCompacts = fieldTexts
-          .map((e) => e.replaceAll(RegExp(r'[^a-z0-9]'), ''))
-          .where((e) => e.length >= minSearchLen)
-          .toList();
-
-      final searchText = fieldTexts.join(' ');
-      final compactText = searchText.replaceAll(RegExp(r'[^a-z0-9]'), '');
-
-      final manualFieldTexts = manualRawFields
-          .map(_normalizeForSearch)
-          .where((e) => e.trim().isNotEmpty)
-          .toList();
-      final manualSearchText = manualFieldTexts.join(' ');
-      final manualCompactText = manualSearchText.replaceAll(
-        RegExp(r'[^a-z0-9]'),
-        '',
-      );
-
-      final tokens = searchText
-          .split(RegExp(r'[\s\-/._]+'))
-          .map((e) => e.trim())
-          .where((e) => e.length >= 2)
-          .toSet();
-
-      for (final field in rawFields) {
-        for (final key in _buildOcrLookupKeys(field)) {
-          addOcrLookupKey(item, key);
-        }
-      }
-
-      searchEntries.add(
-        CatalogSearchEntry(
-          item: item,
-          searchText: searchText,
-          compactText: compactText,
-          manualSearchText: manualSearchText,
-          manualCompactText: manualCompactText,
-          fieldTexts: fieldTexts,
-          fieldCompacts: fieldCompacts,
-          tokens: tokens,
-        ),
-      );
-
-      if (i % 150 == 0) {
-        await Future<void>.delayed(Duration.zero);
-      }
-    }
+    final index = await compute(
+      _buildCatalogSearchIndexInBackground,
+      catalogSnapshot,
+    );
 
     if (!mounted || runId != _catalogIndexBuildRunId) return;
 
-    _catalogSearchIndex = searchEntries;
-    _ocrLookupIndex = ocrLookupIndex;
+    _catalogSearchIndex = index.searchEntries;
+    _ocrLookupIndex = index.ocrLookupIndex;
 
     debugPrint('CATALOG SEARCH INDEX READY: ${_catalogSearchIndex.length}');
     debugPrint('OCR LOOKUP INDEX READY: ${_ocrLookupIndex.length}');
@@ -1448,7 +1625,7 @@ class _MainSearchPageState extends State<MainSearchPage>
       final cachedJson = await CatalogCachePrefs.getCatalogJson();
       if (cachedJson == null || cachedJson.isEmpty) return false;
 
-      final items = _parseCatalogItems(cachedJson);
+      final items = await _parseCatalogItems(cachedJson);
       if (!mounted) return false;
 
       setState(() {
@@ -1476,7 +1653,7 @@ class _MainSearchPageState extends State<MainSearchPage>
       final resp = await http
           .get(Uri.parse(AppConfig.catalogUrl))
           .timeout(const Duration(seconds: 12));
-      final items = _parseCatalogItems(resp.body);
+      final items = await _parseCatalogItems(resp.body);
 
       if (!mounted) return;
 
@@ -1532,33 +1709,7 @@ class _MainSearchPageState extends State<MainSearchPage>
   }
 
   String _normalizeForSearch(String input) {
-    var s = input.toLowerCase().trim();
-
-    const replacements = {'ä': 'a', 'ö': 'o', 'ü': 'u', 'ß': 'ss'};
-
-    replacements.forEach((key, value) {
-      s = s.replaceAll(key, value);
-    });
-
-    s = s.replaceAll(RegExp(r'[^a-z0-9/_. -]'), '');
-    s = s.replaceAll(RegExp(r'\s+'), ' ').trim();
-
-    // einzelne Tokens behandeln, damit z. B. 00525995 -> 525995 wird
-    final parts = s
-        .split(' ')
-        .map((part) {
-          // nur bei rein numerischen Tokens führende Nullen entfernen
-          if (RegExp(r'^0+\d+$').hasMatch(part)) {
-            return part.replaceFirst(RegExp(r'^0+'), '');
-          }
-
-          // auch für gemischte Formen wie 00-123 eher nicht anfassen
-          return part;
-        })
-        .where((e) => e.isNotEmpty)
-        .toList();
-
-    return parts.join(' ');
+    return _normalizeCatalogSearchText(input);
   }
 
   Set<String> _buildCompareVariants(String input) {
@@ -3606,10 +3757,9 @@ class _MainSearchPageState extends State<MainSearchPage>
       final resp = await http
           .get(Uri.parse(AppConfig.dwgListUrl))
           .timeout(const Duration(seconds: 8));
-      final data = jsonDecode(resp.body);
+      final count = await compute(_parseDwgDisplayCountInBackground, resp.body);
 
-      if (data is Map<String, dynamic>) {
-        final count = data.keys.length;
+      if (count != null) {
         await CatalogCachePrefs.setDwgDisplayCount(count);
 
         if (!mounted) return;
@@ -4146,7 +4296,11 @@ class _MainSearchPageState extends State<MainSearchPage>
     );
   }
 
-  Future<void> _downloadWithTarget(String fileUrl, String filename) async {
+  Future<void> _downloadWithTarget(
+    String fileUrl,
+    String filename, {
+    required String installationType,
+  }) async {
     try {
       final shareFile = await _askDownloadAction();
 
@@ -4165,7 +4319,30 @@ class _MainSearchPageState extends State<MainSearchPage>
         return;
       }
 
-      final Uint8List bytes = response.bodyBytes;
+      Uint8List bytes = response.bodyBytes;
+      try {
+        final layerSettings = await DxfLayerPrefs.getSettings();
+        if (layerSettings.enabled) {
+          bytes = DxfLayerProcessor.rewriteAusschnittLayers(
+            response.bodyBytes,
+            falzLayer: layerSettings.falzLayer,
+            gesaegtLayer: layerSettings.gesaegtLayer,
+            auflageLayer: layerSettings.auflageLayer,
+            unterbauLayer: layerSettings.unterbauLayer,
+            bohrungLayer: layerSettings.bohrungLayer,
+            konstruktionLayer: layerSettings.konstruktionLayer,
+            falzColor: layerSettings.falzColor,
+            gesaegtColor: layerSettings.gesaegtColor,
+            auflageColor: layerSettings.auflageColor,
+            unterbauColor: layerSettings.unterbauColor,
+            bohrungColor: layerSettings.bohrungColor,
+            konstruktionColor: layerSettings.konstruktionColor,
+            cutType: DxfLayerProcessor.detectCutType(installationType),
+          );
+        }
+      } catch (_) {
+        bytes = response.bodyBytes;
+      }
       final String saveName = _safeDxfFileName(filename);
 
       if (shareFile) {
@@ -4461,6 +4638,8 @@ class _MainSearchPageState extends State<MainSearchPage>
                       Expanded(
                         child: TextField(
                           controller: _searchController,
+                          focusNode: _searchFocusNode,
+                          autofocus: false,
                           textInputAction: TextInputAction.search,
                           onSubmitted: _handleSearchDirect,
                           decoration: InputDecoration(
@@ -4481,7 +4660,7 @@ class _MainSearchPageState extends State<MainSearchPage>
                       ),
                       const SizedBox(width: 10),
                       _HeaderActionButton(
-                        icon: Icons.info_outline,
+                        icon: Icons.settings_outlined,
                         onTap: _showInfoDialog,
                         smallIcon: true,
                       ),
@@ -4751,6 +4930,8 @@ class _MainSearchPageState extends State<MainSearchPage>
                                                         _downloadWithTarget(
                                                           downloadUrlSafe,
                                                           filename,
+                                                          installationType:
+                                                              einbauTyp,
                                                         );
                                                       }
                                                     : null,
@@ -4888,6 +5069,22 @@ class _InfoLicensePageState extends State<InfoLicensePage> {
   String _deviceUuid = '';
   DeviceMeta? _deviceMeta;
   String _downloadDir = '';
+  bool _showInfoAndLicense = false;
+  DxfLayerSettings _dxfLayerSettings = const DxfLayerSettings(
+    enabled: true,
+    falzLayer: DxfLayerPrefs.defaultFalzLayer,
+    gesaegtLayer: DxfLayerPrefs.defaultGesaegtLayer,
+    auflageLayer: DxfLayerPrefs.defaultAuflageLayer,
+    unterbauLayer: DxfLayerPrefs.defaultUnterbauLayer,
+    bohrungLayer: DxfLayerPrefs.defaultBohrungLayer,
+    konstruktionLayer: DxfLayerPrefs.defaultKonstruktionLayer,
+    falzColor: DxfLayerPrefs.defaultLayerColor,
+    gesaegtColor: DxfLayerPrefs.defaultLayerColor,
+    auflageColor: DxfLayerPrefs.defaultLayerColor,
+    unterbauColor: DxfLayerPrefs.defaultLayerColor,
+    bohrungColor: DxfLayerPrefs.defaultLayerColor,
+    konstruktionColor: DxfLayerPrefs.defaultLayerColor,
+  );
 
   @override
   void initState() {
@@ -4901,6 +5098,7 @@ class _InfoLicensePageState extends State<InfoLicensePage> {
       final meta = await DeviceMetaService.load();
       final data = await ApiService.getLicenseStatus();
       final lastDir = await DownloadPrefs.getDownloadDir();
+      final dxfLayerSettings = await DxfLayerPrefs.getSettings();
 
       if (!mounted) return;
 
@@ -4908,6 +5106,7 @@ class _InfoLicensePageState extends State<InfoLicensePage> {
         _deviceUuid = uuid;
         _deviceMeta = meta;
         _downloadDir = lastDir ?? '';
+        _dxfLayerSettings = dxfLayerSettings;
 
         if (data['success'] == true) {
           _data = data;
@@ -5000,6 +5199,25 @@ class _InfoLicensePageState extends State<InfoLicensePage> {
     );
   }
 
+  Future<void> _openPrivacyPolicy() async {
+    final uri = Uri.parse(AppConfig.privacyPolicyUrl);
+    bool opened = false;
+
+    try {
+      opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (_) {
+      opened = false;
+    }
+
+    if (!opened && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Datenschutzseite konnte nicht geoeffnet werden.'),
+        ),
+      );
+    }
+  }
+
   Widget _infoSection({
     required IconData icon,
     required String title,
@@ -5049,6 +5267,129 @@ class _InfoLicensePageState extends State<InfoLicensePage> {
     );
   }
 
+  Future<void> _editDxfLayerSettings() async {
+    final settings = await showDialog<DxfLayerSettings>(
+      context: context,
+      builder: (_) => _DxfLayerSettingsDialog(
+        initialSettings: _dxfLayerSettings,
+        validate: _validateDxfLayerSettings,
+      ),
+    );
+
+    if (settings == null) return;
+
+    await DxfLayerPrefs.setSettings(settings);
+
+    if (!mounted) return;
+
+    setState(() {
+      _dxfLayerSettings = settings;
+    });
+
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('DXF-Layer gespeichert.')));
+  }
+
+  Future<void> _setDxfLayerProcessingEnabled(bool enabled) async {
+    final settings = _dxfLayerSettings.copyWith(enabled: enabled);
+    await DxfLayerPrefs.setSettings(settings);
+
+    if (!mounted) return;
+
+    setState(() {
+      _dxfLayerSettings = settings;
+    });
+  }
+
+  String? _validateDxfLayerSettings(
+    String falzLayer,
+    String gesaegtLayer,
+    String auflageLayer,
+    String unterbauLayer,
+    String bohrungLayer,
+    String konstruktionLayer,
+    int? falzColor,
+    int? gesaegtColor,
+    int? auflageColor,
+    int? unterbauColor,
+    int? bohrungColor,
+    int? konstruktionColor,
+  ) {
+    final falzError = _validateDxfLayerName(falzLayer);
+    if (falzError != null) return 'Falz: $falzError';
+
+    final gesaegtError = _validateDxfLayerName(gesaegtLayer);
+    if (gesaegtError != null) return 'Gesägt: $gesaegtError';
+
+    final auflageError = _validateDxfLayerName(auflageLayer);
+    if (auflageError != null) return 'Auflage: $auflageError';
+
+    final unterbauError = _validateDxfLayerName(unterbauLayer);
+    if (unterbauError != null) return 'Unterbau: $unterbauError';
+
+    final bohrungError = _validateDxfLayerName(bohrungLayer);
+    if (bohrungError != null) return 'Bohrungen: $bohrungError';
+
+    final konstruktionError = _validateDxfLayerName(konstruktionLayer);
+    if (konstruktionError != null) {
+      return 'Konstruktion: $konstruktionError';
+    }
+
+    final colorError = _validateDxfColors({
+      'Falz': falzColor,
+      'Gesägt': gesaegtColor,
+      'Auflage': auflageColor,
+      'Unterbau': unterbauColor,
+      'Bohrungen': bohrungColor,
+      'Konstruktion': konstruktionColor,
+    });
+    if (colorError != null) return colorError;
+
+    if (falzLayer.toUpperCase() == gesaegtLayer.toUpperCase()) {
+      return 'Die beiden Ziellayer müssen unterschiedlich sein.';
+    }
+
+    return null;
+  }
+
+  String? _validateDxfColors(Map<String, int?> colors) {
+    for (final entry in colors.entries) {
+      final color = entry.value;
+
+      if (color == null) {
+        return '${entry.key}: Bitte eine Farbe von 1 bis 255 eintragen.';
+      }
+
+      if (color < 1 || color > 255) {
+        return '${entry.key}: Die Farbe muss zwischen 1 und 255 liegen.';
+      }
+    }
+
+    return null;
+  }
+
+  String? _validateDxfLayerName(String layerName) {
+    if (layerName.isEmpty) return 'Bitte einen Layernamen eintragen.';
+    if (layerName.contains(RegExp(r'\s'))) {
+      return 'Achtung: Es dürfen keine Leerzeichen im Layernamen vorhanden sein.';
+    }
+    if (layerName.contains(RegExp(r'[<>/":;?*|=]'))) {
+      return 'Der Layername enthält ein ungültiges Zeichen.';
+    }
+    if (layerName.contains('\n') || layerName.contains('\r')) {
+      return 'Der Layername darf keinen Zeilenumbruch enthalten.';
+    }
+
+    try {
+      latin1.encode(layerName);
+    } catch (_) {
+      return 'Der Layername enthält ein Zeichen, das DXF nicht speichern kann.';
+    }
+
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
     final firm = _data?['firm'] as Map<String, dynamic>?;
@@ -5061,7 +5402,7 @@ class _InfoLicensePageState extends State<InfoLicensePage> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text('Info & Lizenz'),
+        title: const Text('Einstellungen'),
         actions: [
           IconButton(onPressed: _init, icon: const Icon(Icons.refresh)),
         ],
@@ -5096,90 +5437,6 @@ class _InfoLicensePageState extends State<InfoLicensePage> {
                               ),
                             ),
                           ),
-                        const Text(
-                          'Lizenzübersicht',
-                          style: TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        _InfoCard(
-                          title: 'Benutzer',
-                          icon: Icons.person_outline,
-                          children: [
-                            _InfoRow(
-                              label: 'Name',
-                              value: '${user?['name'] ?? ''}',
-                            ),
-                            _InfoRow(
-                              label: 'E-Mail',
-                              value: '${user?['email'] ?? ''}',
-                            ),
-                            _InfoRow(
-                              label: 'Rolle',
-                              value: '${user?['role'] ?? ''}',
-                            ),
-                          ],
-                        ),
-                        _InfoCard(
-                          title: 'Firma',
-                          icon: Icons.business_outlined,
-                          children: [
-                            _InfoRow(
-                              label: 'Name',
-                              value: '${firm?['name'] ?? ''}',
-                            ),
-                            _StatusRow(label: 'Status', value: firmStatus),
-                            _InfoRow(
-                              label: 'Max Geräte',
-                              value: '${firm?['max_devices'] ?? ''}',
-                            ),
-                            _InfoRow(
-                              label: 'Lizenz bis',
-                              value: '${firm?['license_end'] ?? ''}',
-                            ),
-                            _InfoRow(
-                              label: 'Tage übrig',
-                              value: '${firm?['days_left'] ?? ''}',
-                            ),
-                          ],
-                        ),
-                        _InfoCard(
-                          title: 'Gerät',
-                          icon: Icons.tablet_android_outlined,
-                          children: [
-                            _InfoRow(
-                              label: 'Lokale Geräte-ID',
-                              value: _deviceUuid,
-                            ),
-                            _InfoRow(
-                              label: 'Erkanntes Gerät',
-                              value: _deviceMeta?.deviceName ?? '',
-                            ),
-                            _InfoRow(
-                              label: 'Erkanntes OS',
-                              value: _deviceMeta?.osVersion ?? '',
-                            ),
-                            _InfoRow(
-                              label: 'App-Version',
-                              value: _deviceMeta?.appVersion ?? '',
-                            ),
-                            _InfoRow(
-                              label: 'Server UUID',
-                              value: '${device?['device_uuid'] ?? ''}',
-                            ),
-                            _InfoRow(
-                              label: 'Server-Name',
-                              value: '${device?['device_name'] ?? ''}',
-                            ),
-                            _StatusRow(
-                              label: 'Gerätestatus',
-                              value: deviceStatus,
-                            ),
-                          ],
-                        ),
-
                         _InfoCard(
                           title: 'Download-Ziel',
                           icon: Icons.folder_outlined,
@@ -5216,15 +5473,195 @@ class _InfoLicensePageState extends State<InfoLicensePage> {
                           ),
                         ),
 
+                        _InfoCard(
+                          title: 'DXF-Layer bearbeiten',
+                          icon: Icons.layers_outlined,
+                          children: [
+                            SwitchListTile(
+                              value: _dxfLayerSettings.enabled,
+                              onChanged: _setDxfLayerProcessingEnabled,
+                              contentPadding: EdgeInsets.zero,
+                              title: const Text(
+                                'Layer beim DXF-Download automatisch anpassen',
+                              ),
+                              subtitle: const Text(
+                                'Deaktiviert: Die DXF-Datei wird unverändert im Original heruntergeladen.',
+                              ),
+                            ),
+                            _InfoRow(
+                              label: 'Flächenbündig (aussen)',
+                              value:
+                                  '${_dxfLayerSettings.falzLayer} / ${_dxfAciColorName(_dxfLayerSettings.falzColor)}',
+                            ),
+                            _InfoRow(
+                              label: 'Flächenbündig (innen)',
+                              value:
+                                  '${_dxfLayerSettings.gesaegtLayer} / ${_dxfAciColorName(_dxfLayerSettings.gesaegtColor)}',
+                            ),
+                            _InfoRow(
+                              label: 'Auflage',
+                              value:
+                                  '${_dxfLayerSettings.auflageLayer} / ${_dxfAciColorName(_dxfLayerSettings.auflageColor)}',
+                            ),
+                            _InfoRow(
+                              label: 'Unterbau',
+                              value:
+                                  '${_dxfLayerSettings.unterbauLayer} / ${_dxfAciColorName(_dxfLayerSettings.unterbauColor)}',
+                            ),
+                            _InfoRow(
+                              label: 'Bohrungen',
+                              value:
+                                  '${_dxfLayerSettings.bohrungLayer} / ${_dxfAciColorName(_dxfLayerSettings.bohrungColor)}',
+                            ),
+                            _InfoRow(
+                              label: 'Konstruktion',
+                              value:
+                                  '${_dxfLayerSettings.konstruktionLayer} / ${_dxfAciColorName(_dxfLayerSettings.konstruktionColor)}',
+                            ),
+                            const Text(
+                              'Passen Sie die DXF-Layer beim Download automatisch an Ihre CNC-, Säge-, Wasserstrahl- oder andere Maschinen an.',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.black54,
+                                height: 1.35,
+                              ),
+                            ),
+                          ],
+                        ),
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            onPressed: _editDxfLayerSettings,
+                            icon: const Icon(Icons.edit_outlined),
+                            label: const Text('DXF-Layer ändern'),
+                          ),
+                        ),
+
                         const SizedBox(height: 12),
                         SizedBox(
                           width: double.infinity,
                           child: OutlinedButton.icon(
-                            onPressed: _showLicenseAgreement,
-                            icon: const Icon(Icons.description_outlined),
-                            label: const Text('Lizenzvereinbarung anzeigen'),
+                            onPressed: () {
+                              setState(() {
+                                _showInfoAndLicense = !_showInfoAndLicense;
+                              });
+                            },
+                            icon: Icon(
+                              _showInfoAndLicense
+                                  ? Icons.expand_less
+                                  : Icons.info_outline,
+                            ),
+                            label: Text(
+                              _showInfoAndLicense
+                                  ? 'Info & Lizenz ausblenden'
+                                  : 'Info & Lizenz',
+                            ),
                           ),
                         ),
+
+                        if (_showInfoAndLicense) ...[
+                          const SizedBox(height: 18),
+                          const Text(
+                            'Lizenzübersicht',
+                            style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          _InfoCard(
+                            title: 'Benutzer',
+                            icon: Icons.person_outline,
+                            children: [
+                              _InfoRow(
+                                label: 'Name',
+                                value: '${user?['name'] ?? ''}',
+                              ),
+                              _InfoRow(
+                                label: 'E-Mail',
+                                value: '${user?['email'] ?? ''}',
+                              ),
+                              _InfoRow(
+                                label: 'Rolle',
+                                value: '${user?['role'] ?? ''}',
+                              ),
+                            ],
+                          ),
+                          _InfoCard(
+                            title: 'Firma',
+                            icon: Icons.business_outlined,
+                            children: [
+                              _InfoRow(
+                                label: 'Name',
+                                value: '${firm?['name'] ?? ''}',
+                              ),
+                              _StatusRow(label: 'Status', value: firmStatus),
+                              _InfoRow(
+                                label: 'Max Geräte',
+                                value: '${firm?['max_devices'] ?? ''}',
+                              ),
+                              _InfoRow(
+                                label: 'Lizenz bis',
+                                value: '${firm?['license_end'] ?? ''}',
+                              ),
+                              _InfoRow(
+                                label: 'Tage übrig',
+                                value: '${firm?['days_left'] ?? ''}',
+                              ),
+                            ],
+                          ),
+                          _InfoCard(
+                            title: 'Gerät',
+                            icon: Icons.tablet_android_outlined,
+                            children: [
+                              _InfoRow(
+                                label: 'Lokale Geräte-ID',
+                                value: _deviceUuid,
+                              ),
+                              _InfoRow(
+                                label: 'Erkanntes Gerät',
+                                value: _deviceMeta?.deviceName ?? '',
+                              ),
+                              _InfoRow(
+                                label: 'Erkanntes OS',
+                                value: _deviceMeta?.osVersion ?? '',
+                              ),
+                              _InfoRow(
+                                label: 'App-Version',
+                                value: _deviceMeta?.appVersion ?? '',
+                              ),
+                              _InfoRow(
+                                label: 'Server UUID',
+                                value: '${device?['device_uuid'] ?? ''}',
+                              ),
+                              _InfoRow(
+                                label: 'Server-Name',
+                                value: '${device?['device_name'] ?? ''}',
+                              ),
+                              _StatusRow(
+                                label: 'Gerätestatus',
+                                value: deviceStatus,
+                              ),
+                            ],
+                          ),
+                          SizedBox(
+                            width: double.infinity,
+                            child: OutlinedButton.icon(
+                              onPressed: _showLicenseAgreement,
+                              icon: const Icon(Icons.description_outlined),
+                              label: const Text('Lizenzvereinbarung anzeigen'),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          SizedBox(
+                            width: double.infinity,
+                            child: OutlinedButton.icon(
+                              onPressed: _openPrivacyPolicy,
+                              icon: const Icon(Icons.privacy_tip_outlined),
+                              label: const Text('Datenschutz'),
+                            ),
+                          ),
+                        ],
                         const SizedBox(height: 24),
                       ],
                     ),
@@ -5367,6 +5804,429 @@ class _FooterLinkRow extends StatelessWidget {
       ),
     );
   }
+}
+
+typedef _DxfLayerSettingsValidator =
+    String? Function(
+      String falzLayer,
+      String gesaegtLayer,
+      String auflageLayer,
+      String unterbauLayer,
+      String bohrungLayer,
+      String konstruktionLayer,
+      int? falzColor,
+      int? gesaegtColor,
+      int? auflageColor,
+      int? unterbauColor,
+      int? bohrungColor,
+      int? konstruktionColor,
+    );
+
+class _DxfLayerSettingsDialog extends StatefulWidget {
+  final DxfLayerSettings initialSettings;
+  final _DxfLayerSettingsValidator validate;
+
+  const _DxfLayerSettingsDialog({
+    required this.initialSettings,
+    required this.validate,
+  });
+
+  @override
+  State<_DxfLayerSettingsDialog> createState() =>
+      _DxfLayerSettingsDialogState();
+}
+
+class _DxfLayerSettingsDialogState extends State<_DxfLayerSettingsDialog> {
+  late final TextEditingController _falzController;
+  late final TextEditingController _gesaegtController;
+  late final TextEditingController _auflageController;
+  late final TextEditingController _unterbauController;
+  late final TextEditingController _bohrungController;
+  late final TextEditingController _konstruktionController;
+  late int _falzColor;
+  late int _gesaegtColor;
+  late int _auflageColor;
+  late int _unterbauColor;
+  late int _bohrungColor;
+  late int _konstruktionColor;
+
+  String? _errorText;
+
+  @override
+  void initState() {
+    super.initState();
+
+    final settings = widget.initialSettings;
+    _falzController = TextEditingController(text: settings.falzLayer);
+    _gesaegtController = TextEditingController(text: settings.gesaegtLayer);
+    _auflageController = TextEditingController(text: settings.auflageLayer);
+    _unterbauController = TextEditingController(text: settings.unterbauLayer);
+    _bohrungController = TextEditingController(text: settings.bohrungLayer);
+    _konstruktionController = TextEditingController(
+      text: settings.konstruktionLayer,
+    );
+    _falzColor = settings.falzColor;
+    _gesaegtColor = settings.gesaegtColor;
+    _auflageColor = settings.auflageColor;
+    _unterbauColor = settings.unterbauColor;
+    _bohrungColor = settings.bohrungColor;
+    _konstruktionColor = settings.konstruktionColor;
+  }
+
+  @override
+  void dispose() {
+    _falzController.dispose();
+    _gesaegtController.dispose();
+    _auflageController.dispose();
+    _unterbauController.dispose();
+    _bohrungController.dispose();
+    _konstruktionController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('DXF-Layer'),
+      content: SizedBox(
+        width: 460,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _inputRow(
+                label: 'AUSSCHNITT Falz',
+                layerController: _falzController,
+                selectedColor: _falzColor,
+                onColorSelected: (color) => setState(() {
+                  _falzColor = color;
+                }),
+              ),
+              const SizedBox(height: 12),
+              _inputRow(
+                label: 'AUSSCHNITT gesägt',
+                layerController: _gesaegtController,
+                selectedColor: _gesaegtColor,
+                onColorSelected: (color) => setState(() {
+                  _gesaegtColor = color;
+                }),
+              ),
+              const SizedBox(height: 12),
+              _inputRow(
+                label: 'Auflage',
+                layerController: _auflageController,
+                selectedColor: _auflageColor,
+                onColorSelected: (color) => setState(() {
+                  _auflageColor = color;
+                }),
+              ),
+              const SizedBox(height: 12),
+              _inputRow(
+                label: 'Unterbau',
+                layerController: _unterbauController,
+                selectedColor: _unterbauColor,
+                onColorSelected: (color) => setState(() {
+                  _unterbauColor = color;
+                }),
+              ),
+              const SizedBox(height: 12),
+              _inputRow(
+                label: 'Bohrungen',
+                layerController: _bohrungController,
+                selectedColor: _bohrungColor,
+                onColorSelected: (color) => setState(() {
+                  _bohrungColor = color;
+                }),
+              ),
+              const SizedBox(height: 12),
+              _inputRow(
+                label: 'Konstruktion',
+                layerController: _konstruktionController,
+                selectedColor: _konstruktionColor,
+                onColorSelected: (color) => setState(() {
+                  _konstruktionColor = color;
+                }),
+              ),
+              if (_errorText != null) ...[
+                const SizedBox(height: 12),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    _errorText!,
+                    style: const TextStyle(color: Colors.red, fontSize: 13),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Abbrechen'),
+        ),
+        ElevatedButton(onPressed: _save, child: const Text('Speichern')),
+      ],
+    );
+  }
+
+  Widget _inputRow({
+    required String label,
+    required TextEditingController layerController,
+    required int selectedColor,
+    required ValueChanged<int> onColorSelected,
+  }) {
+    return Row(
+      children: [
+        Expanded(
+          flex: 3,
+          child: TextField(
+            controller: layerController,
+            decoration: InputDecoration(
+              labelText: label,
+              border: const OutlineInputBorder(),
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        SizedBox(
+          width: 132,
+          child: _DxfColorSelectButton(
+            selectedColor: selectedColor,
+            onSelected: onColorSelected,
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _save() {
+    final falzLayer = _falzController.text.trim();
+    final gesaegtLayer = _gesaegtController.text.trim();
+    final auflageLayer = _auflageController.text.trim();
+    final unterbauLayer = _unterbauController.text.trim();
+    final bohrungLayer = _bohrungController.text.trim();
+    final konstruktionLayer = _konstruktionController.text.trim();
+    final validationError = widget.validate(
+      falzLayer,
+      gesaegtLayer,
+      auflageLayer,
+      unterbauLayer,
+      bohrungLayer,
+      konstruktionLayer,
+      _falzColor,
+      _gesaegtColor,
+      _auflageColor,
+      _unterbauColor,
+      _bohrungColor,
+      _konstruktionColor,
+    );
+
+    if (validationError != null) {
+      setState(() {
+        _errorText = validationError;
+      });
+      return;
+    }
+
+    Navigator.of(context).pop(
+      DxfLayerSettings(
+        enabled: widget.initialSettings.enabled,
+        falzLayer: falzLayer,
+        gesaegtLayer: gesaegtLayer,
+        auflageLayer: auflageLayer,
+        unterbauLayer: unterbauLayer,
+        bohrungLayer: bohrungLayer,
+        konstruktionLayer: konstruktionLayer,
+        falzColor: _falzColor,
+        gesaegtColor: _gesaegtColor,
+        auflageColor: _auflageColor,
+        unterbauColor: _unterbauColor,
+        bohrungColor: _bohrungColor,
+        konstruktionColor: _konstruktionColor,
+      ),
+    );
+  }
+}
+
+class _DxfColorSelectButton extends StatelessWidget {
+  final int selectedColor;
+  final ValueChanged<int> onSelected;
+
+  const _DxfColorSelectButton({
+    required this.selectedColor,
+    required this.onSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = _dxfAciFlutterColor(selectedColor);
+
+    return OutlinedButton(
+      onPressed: () async {
+        final result = await showDialog<int>(
+          context: context,
+          builder: (_) => _DxfColorPickerDialog(selectedColor: selectedColor),
+        );
+
+        if (result != null) onSelected(result);
+      },
+      style: OutlinedButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 13),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 18,
+            height: 18,
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(4),
+              border: Border.all(color: Colors.black26),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              _dxfAciColorName(selectedColor),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DxfColorPickerDialog extends StatelessWidget {
+  final int selectedColor;
+
+  const _DxfColorPickerDialog({required this.selectedColor});
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Farbe wählen'),
+      content: SizedBox(
+        width: 380,
+        child: GridView.builder(
+          shrinkWrap: true,
+          itemCount: _dxfAciColorOptions.length,
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 4,
+            mainAxisSpacing: 10,
+            crossAxisSpacing: 10,
+            childAspectRatio: 1.35,
+          ),
+          itemBuilder: (context, index) {
+            final option = _dxfAciColorOptions[index];
+            final selected = option.aci == selectedColor;
+            return Tooltip(
+              message: option.name,
+              child: InkWell(
+                onTap: () => Navigator.of(context).pop(option.aci),
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: option.color,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: selected ? Colors.black : Colors.black26,
+                      width: selected ? 3 : 1,
+                    ),
+                  ),
+                  alignment: Alignment.center,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: _dxfReadableLabelBackground(option.color),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      option.name,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: _dxfReadableLabelColor(option.color),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Abbrechen'),
+        ),
+      ],
+    );
+  }
+}
+
+class _DxfAciColorOption {
+  final int aci;
+  final String name;
+  final Color color;
+
+  const _DxfAciColorOption({
+    required this.aci,
+    required this.name,
+    required this.color,
+  });
+}
+
+const List<_DxfAciColorOption> _dxfAciColorOptions = [
+  _DxfAciColorOption(aci: 1, name: 'Rot', color: Color(0xFFE53935)),
+  _DxfAciColorOption(aci: 2, name: 'Gelb', color: Color(0xFFFFD600)),
+  _DxfAciColorOption(aci: 3, name: 'Grün', color: Color(0xFF43A047)),
+  _DxfAciColorOption(aci: 4, name: 'Cyan', color: Color(0xFF00ACC1)),
+  _DxfAciColorOption(aci: 5, name: 'Blau', color: Color(0xFF1E5BFF)),
+  _DxfAciColorOption(aci: 6, name: 'Magenta', color: Color(0xFFD81B60)),
+  _DxfAciColorOption(aci: 7, name: 'Weiß', color: Color(0xFFFFFFFF)),
+  _DxfAciColorOption(aci: 8, name: 'Grau', color: Color(0xFF777777)),
+  _DxfAciColorOption(aci: 9, name: 'Hellgrau', color: Color(0xFFC8C8C8)),
+  _DxfAciColorOption(aci: 30, name: 'Orange', color: Color(0xFFFF8F00)),
+  _DxfAciColorOption(aci: 140, name: 'Violett', color: Color(0xFF8E24AA)),
+  _DxfAciColorOption(aci: 170, name: 'Braun', color: Color(0xFF8D6E63)),
+];
+
+String _dxfAciColorName(int aci) {
+  for (final option in _dxfAciColorOptions) {
+    if (option.aci == aci) return option.name;
+  }
+
+  return 'Farbe';
+}
+
+Color _dxfAciFlutterColor(int aci) {
+  for (final option in _dxfAciColorOptions) {
+    if (option.aci == aci) return option.color;
+  }
+
+  return const Color(0xFF777777);
+}
+
+Color _dxfReadableLabelBackground(Color color) {
+  return _dxfColorIsLight(color) ? Colors.black54 : Colors.white70;
+}
+
+Color _dxfReadableLabelColor(Color color) {
+  return _dxfColorIsLight(color) ? Colors.white : Colors.black87;
+}
+
+bool _dxfColorIsLight(Color color) {
+  return color.computeLuminance() > 0.58;
 }
 
 class _InfoCard extends StatelessWidget {
