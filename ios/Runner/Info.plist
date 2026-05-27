@@ -10,6 +10,8 @@
 	<string>Die Fotobibliothek wird verwendet, um ein vorhandenes Bild eines Etiketts auszuwählen und daraus Artikelnummern per OCR zu erkennen.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Die App speichert keine Bilder in der Fotobibliothek. Diese Berechtigung wird nur benötigt, falls iOS oder verwendete Bibliotheken das Speichern von Dateien anfordern.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Die ATool App verwendet Standortdaten nicht aktiv. Diese Berechtigung kann durch eingebundene Systemfunktionen oder Bibliotheken erforderlich sein.</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>
