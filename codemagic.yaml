@@ -47,7 +47,13 @@ workflows:
 
       - name: iOS IPA bauen
         script: |
+          APP_VERSION=$(grep '^version:' pubspec.yaml | awk '{print $2}')
+          BUILD_NAME=${APP_VERSION%%+*}
+          BUILD_NUMBER=${APP_VERSION##*+}
+          echo "Building iOS version $BUILD_NAME ($BUILD_NUMBER)"
           flutter build ipa --release \
+            --build-name="$BUILD_NAME" \
+            --build-number="$BUILD_NUMBER" \
             --export-options-plist=/Users/builder/export_options.plist
 
     artifacts:
