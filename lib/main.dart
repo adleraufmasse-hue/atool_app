@@ -591,6 +591,23 @@ class DeviceMetaService {
 }
 
 class ApiService {
+  static const Duration requestTimeout = Duration(seconds: 12);
+
+  static Future<http.Response> _get(
+    Uri uri, {
+    Map<String, String>? headers,
+  }) {
+    return http.get(uri, headers: headers).timeout(requestTimeout);
+  }
+
+  static Future<http.Response> _post(
+    Uri uri, {
+    Map<String, String>? headers,
+    Object? body,
+  }) {
+    return http.post(uri, headers: headers, body: body).timeout(requestTimeout);
+  }
+
   static Future<Map<String, dynamic>> login({
     required String email,
     required String password,
@@ -600,7 +617,7 @@ class ApiService {
 
     final uri = Uri.parse('${AppConfig.baseUrl}/login.php');
 
-    final response = await http.post(
+    final response = await _post(
       uri,
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
@@ -626,7 +643,7 @@ class ApiService {
   }) async {
     final uri = Uri.parse('${AppConfig.baseUrl}/register-trial.php');
 
-    final response = await http.post(
+    final response = await _post(
       uri,
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
@@ -650,7 +667,7 @@ class ApiService {
 
     final uri = Uri.parse('${AppConfig.baseUrl}/refresh-token.php');
 
-    final response = await http.post(
+    final response = await _post(
       uri,
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'refresh_token': refreshToken}),
@@ -677,7 +694,7 @@ class ApiService {
 
     final uri = Uri.parse('${AppConfig.baseUrl}/license-status.php');
 
-    final response = await http.get(
+    final response = await _get(
       uri,
       headers: {'Authorization': 'Bearer $accessToken'},
     );
@@ -706,7 +723,7 @@ class ApiService {
           };
         }
 
-        final retryResponse = await http.get(
+        final retryResponse = await _get(
           uri,
           headers: {'Authorization': 'Bearer $newAccessToken'},
         );
@@ -731,7 +748,7 @@ class ApiService {
       if (accessToken != null && accessToken.isNotEmpty) {
         final uri = Uri.parse('${AppConfig.baseUrl}/logout.php');
 
-        await http.post(uri, headers: {'Authorization': 'Bearer $accessToken'});
+        await _post(uri, headers: {'Authorization': 'Bearer $accessToken'});
       }
     } catch (_) {}
 

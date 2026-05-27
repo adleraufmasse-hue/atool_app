@@ -20,6 +20,10 @@ workflows:
         script: |
           flutter pub get
 
+      - name: Flutter analyze
+        script: |
+          flutter analyze
+
       - name: CocoaPods installieren, falls Podfile vorhanden
         script: |
           if [ -f ios/Podfile ]; then
