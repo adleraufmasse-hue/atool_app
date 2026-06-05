@@ -221,7 +221,7 @@ class DxfLayerPrefs {
     final konstruktionLayer = await prefs.getString(konstruktionLayerKey);
 
     return DxfLayerSettings(
-      enabled: enabled ?? true,
+      enabled: enabled ?? false,
       falzLayer: _cleanLayerName(falzLayer, defaultFalzLayer),
       gesaegtLayer: _cleanLayerName(gesaegtLayer, defaultGesaegtLayer),
       auflageLayer: _cleanLayerName(auflageLayer, defaultAuflageLayer),
@@ -4657,8 +4657,19 @@ class _MainSearchPageState extends State<MainSearchPage>
                           controller: _searchController,
                           focusNode: _searchFocusNode,
                           autofocus: false,
+                          autocorrect: false,
+                          enableSuggestions: false,
+                          smartDashesType: SmartDashesType.disabled,
+                          smartQuotesType: SmartQuotesType.disabled,
+                          textCapitalization: TextCapitalization.none,
                           textInputAction: TextInputAction.search,
-                          onSubmitted: _handleSearchDirect,
+                          onTapOutside: (_) {
+                            FocusManager.instance.primaryFocus?.unfocus();
+                          },
+                          onSubmitted: (value) {
+                            FocusManager.instance.primaryFocus?.unfocus();
+                            unawaited(_handleSearchDirect(value));
+                          },
                           decoration: InputDecoration(
                             hintText:
                                 'Artikelnummer eingeben (min. $manualSearchLen Zeichen)…',
@@ -4831,6 +4842,8 @@ class _MainSearchPageState extends State<MainSearchPage>
                             ),
                           Expanded(
                             child: ListView.builder(
+                              keyboardDismissBehavior:
+                                  ScrollViewKeyboardDismissBehavior.onDrag,
                               itemCount:
                                   _results.length +
                                   (_ocrBoxTexts.isNotEmpty &&
@@ -5086,9 +5099,10 @@ class _InfoLicensePageState extends State<InfoLicensePage> {
   String _deviceUuid = '';
   DeviceMeta? _deviceMeta;
   String _downloadDir = '';
+  String _downloadDirLabel = '';
   bool _showInfoAndLicense = false;
   DxfLayerSettings _dxfLayerSettings = const DxfLayerSettings(
-    enabled: true,
+    enabled: false,
     falzLayer: DxfLayerPrefs.defaultFalzLayer,
     gesaegtLayer: DxfLayerPrefs.defaultGesaegtLayer,
     auflageLayer: DxfLayerPrefs.defaultAuflageLayer,
@@ -5115,6 +5129,7 @@ class _InfoLicensePageState extends State<InfoLicensePage> {
       final meta = await DeviceMetaService.load();
       final data = await ApiService.getLicenseStatus();
       final lastDir = await DownloadPrefs.getDownloadDir();
+      final lastDirLabel = await DownloadPrefs.getDownloadDirLabel();
       final dxfLayerSettings = await DxfLayerPrefs.getSettings();
 
       if (!mounted) return;
@@ -5123,6 +5138,7 @@ class _InfoLicensePageState extends State<InfoLicensePage> {
         _deviceUuid = uuid;
         _deviceMeta = meta;
         _downloadDir = lastDir ?? '';
+        _downloadDirLabel = lastDirLabel ?? '';
         _dxfLayerSettings = dxfLayerSettings;
 
         if (data['success'] == true) {
@@ -5407,6 +5423,21 @@ class _InfoLicensePageState extends State<InfoLicensePage> {
     return null;
   }
 
+  String get _downloadDirDisplay {
+    if (_downloadDir.isEmpty) return 'Noch nicht gewählt';
+
+    final label = _downloadDirLabel.trim();
+    if (label.isNotEmpty && !label.startsWith('ios-bookmark://')) {
+      return label;
+    }
+
+    if (_downloadDir.startsWith('ios-bookmark://')) {
+      return 'Ausgewählter Ordner';
+    }
+
+    return _downloadDir;
+  }
+
   @override
   Widget build(BuildContext context) {
     final firm = _data?['firm'] as Map<String, dynamic>?;
@@ -5460,9 +5491,7 @@ class _InfoLicensePageState extends State<InfoLicensePage> {
                           children: [
                             _InfoRow(
                               label: 'Ordner',
-                              value: _downloadDir.isEmpty
-                                  ? 'Noch nicht gewählt'
-                                  : _downloadDir,
+                              value: _downloadDirDisplay,
                             ),
                           ],
                         ),
@@ -5475,6 +5504,7 @@ class _InfoLicensePageState extends State<InfoLicensePage> {
 
                               setState(() {
                                 _downloadDir = '';
+                                _downloadDirLabel = '';
                               });
 
                               ScaffoldMessenger.of(this.context).showSnackBar(
@@ -5713,7 +5743,7 @@ class _InfoLicensePageState extends State<InfoLicensePage> {
   }
 }
 
-class ImageViewerPage extends StatelessWidget {
+class ImageViewerPage extends StatefulWidget {
   final String imageUrl;
   final String filename;
 
@@ -5724,28 +5754,78 @@ class ImageViewerPage extends StatelessWidget {
   });
 
   @override
+  State<ImageViewerPage> createState() => _ImageViewerPageState();
+}
+
+class _ImageViewerPageState extends State<ImageViewerPage> {
+  final TransformationController _transformationController =
+      TransformationController();
+  TapDownDetails? _doubleTapDetails;
+  bool _isZoomed = false;
+
+  @override
+  void dispose() {
+    _transformationController.dispose();
+    super.dispose();
+  }
+
+  void _handleDoubleTapDown(TapDownDetails details) {
+    _doubleTapDetails = details;
+  }
+
+  void _handleDoubleTap() {
+    final position = _doubleTapDetails?.localPosition ?? Offset.zero;
+
+    if (_isZoomed) {
+      _transformationController.value = Matrix4.identity();
+      setState(() {
+        _isZoomed = false;
+      });
+      return;
+    }
+
+    const scale = 2.5;
+    _transformationController.value = Matrix4.identity()
+      ..translate(-position.dx * (scale - 1), -position.dy * (scale - 1))
+      ..scale(scale);
+    setState(() {
+      _isZoomed = true;
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(filename)),
-      body: InteractiveViewer(
-        minScale: 0.5,
-        maxScale: 5,
-        child: Center(
-          child: Image.network(
-            imageUrl,
-            fit: BoxFit.contain,
-            errorBuilder: (_, __, ___) => const Padding(
-              padding: EdgeInsets.all(24),
-              child: Text(
-                'Vorschaubild konnte nicht geladen werden.',
-                style: TextStyle(color: Colors.red),
-                textAlign: TextAlign.center,
+      backgroundColor: Colors.black,
+      appBar: AppBar(title: Text(widget.filename)),
+      body: GestureDetector(
+        onDoubleTapDown: _handleDoubleTapDown,
+        onDoubleTap: _handleDoubleTap,
+        child: InteractiveViewer(
+          transformationController: _transformationController,
+          panEnabled: true,
+          scaleEnabled: true,
+          constrained: true,
+          boundaryMargin: const EdgeInsets.all(120),
+          minScale: 0.8,
+          maxScale: 6,
+          child: Center(
+            child: Image.network(
+              widget.imageUrl,
+              fit: BoxFit.contain,
+              errorBuilder: (_, __, ___) => const Padding(
+                padding: EdgeInsets.all(24),
+                child: Text(
+                  'Vorschaubild konnte nicht geladen werden.',
+                  style: TextStyle(color: Colors.red),
+                  textAlign: TextAlign.center,
+                ),
               ),
+              loadingBuilder: (context, child, progress) {
+                if (progress == null) return child;
+                return const Center(child: CircularProgressIndicator());
+              },
             ),
-            loadingBuilder: (context, child, progress) {
-              if (progress == null) return child;
-              return const Center(child: CircularProgressIndicator());
-            },
           ),
         ),
       ),
