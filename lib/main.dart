@@ -5786,8 +5786,13 @@ class _ImageViewerPageState extends State<ImageViewerPage> {
 
     const scale = 2.5;
     _transformationController.value = Matrix4.identity()
-      ..translate(-position.dx * (scale - 1), -position.dy * (scale - 1))
-      ..scale(scale);
+      ..translateByDouble(
+        -position.dx * (scale - 1),
+        -position.dy * (scale - 1),
+        0,
+        1,
+      )
+      ..scaleByDouble(scale, scale, scale, 1);
     setState(() {
       _isZoomed = true;
     });
