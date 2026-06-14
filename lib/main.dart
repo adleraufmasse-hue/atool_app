@@ -4298,6 +4298,14 @@ class _MainSearchPageState extends State<MainSearchPage>
     required Uint8List bytes,
     required String fileName,
   }) async {
+    if (!kIsWeb && Platform.isIOS) {
+      await _downloadChannel.invokeMethod<void>('shareFile', {
+        'bytes': bytes,
+        'fileName': fileName,
+      });
+      return;
+    }
+
     final box = context.findRenderObject() as RenderBox?;
 
     await SharePlus.instance.share(

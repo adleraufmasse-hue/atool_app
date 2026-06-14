@@ -2,6 +2,41 @@ import Flutter
 import UniformTypeIdentifiers
 import UIKit
 
+private final class ShareFileItemSource: NSObject, UIActivityItemSource {
+  private let fileUrl: URL
+
+  init(fileUrl: URL) {
+    self.fileUrl = fileUrl
+  }
+
+  func activityViewControllerPlaceholderItem(
+    _ activityViewController: UIActivityViewController
+  ) -> Any {
+    return fileUrl
+  }
+
+  func activityViewController(
+    _ activityViewController: UIActivityViewController,
+    itemForActivityType activityType: UIActivity.ActivityType?
+  ) -> Any? {
+    return fileUrl
+  }
+
+  func activityViewController(
+    _ activityViewController: UIActivityViewController,
+    dataTypeIdentifierForActivityType activityType: UIActivity.ActivityType?
+  ) -> String {
+    return UTType.data.identifier
+  }
+
+  func activityViewController(
+    _ activityViewController: UIActivityViewController,
+    subjectForActivityType activityType: UIActivity.ActivityType?
+  ) -> String {
+    return fileUrl.lastPathComponent
+  }
+}
+
 @main
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate, UIDocumentPickerDelegate {
   private let downloadsChannel = "de.adleraufmasse.atool/downloads"
@@ -32,6 +67,8 @@ import UIKit
         self?.pickDownloadDirectory(result: result)
       case "saveFileToDirectory":
         self?.saveFileToDirectory(call: call, result: result)
+      case "shareFile":
+        self?.shareFile(call: call, result: result)
       default:
         result(FlutterMethodNotImplemented)
       }
@@ -173,6 +210,79 @@ import UIKit
         details: nil
       ))
     }
+  }
+
+  private func shareFile(call: FlutterMethodCall, result: @escaping FlutterResult) {
+    guard
+      let arguments = call.arguments as? [String: Any],
+      let fileName = arguments["fileName"] as? String,
+      let typedBytes = arguments["bytes"] as? FlutterStandardTypedData
+    else {
+      result(FlutterError(
+        code: "INVALID_ARGUMENTS",
+        message: "Die zu teilende Datei ist unvollstaendig.",
+        details: nil
+      ))
+      return
+    }
+
+    guard let presenter = topViewController() else {
+      result(FlutterError(
+        code: "NO_VIEW_CONTROLLER",
+        message: "Das Teilen-Menue konnte nicht geoeffnet werden.",
+        details: nil
+      ))
+      return
+    }
+
+    let shareDirectory = FileManager.default.temporaryDirectory
+      .appendingPathComponent("AToolShare", isDirectory: true)
+      .appendingPathComponent(UUID().uuidString, isDirectory: true)
+    let fileUrl = shareDirectory.appendingPathComponent(fileName, isDirectory: false)
+
+    do {
+      try FileManager.default.createDirectory(
+        at: shareDirectory,
+        withIntermediateDirectories: true
+      )
+      try typedBytes.data.write(to: fileUrl, options: .atomic)
+    } catch {
+      try? FileManager.default.removeItem(at: shareDirectory)
+      result(FlutterError(
+        code: "SHARE_FILE_FAILED",
+        message: error.localizedDescription,
+        details: nil
+      ))
+      return
+    }
+
+    let activityController = UIActivityViewController(
+      activityItems: [ShareFileItemSource(fileUrl: fileUrl)],
+      applicationActivities: nil
+    )
+    activityController.popoverPresentationController?.sourceView = presenter.view
+    activityController.popoverPresentationController?.sourceRect = CGRect(
+      x: presenter.view.bounds.midX,
+      y: presenter.view.bounds.midY,
+      width: 1,
+      height: 1
+    )
+    activityController.completionWithItemsHandler = {
+      _, completed, _, activityError in
+      try? FileManager.default.removeItem(at: shareDirectory)
+
+      if let activityError {
+        result(FlutterError(
+          code: "SHARE_FAILED",
+          message: activityError.localizedDescription,
+          details: nil
+        ))
+      } else {
+        result(completed)
+      }
+    }
+
+    presenter.present(activityController, animated: true)
   }
 
   private func topViewController() -> UIViewController? {
