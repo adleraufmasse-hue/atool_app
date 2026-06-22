@@ -593,10 +593,7 @@ class DeviceMetaService {
 class ApiService {
   static const Duration requestTimeout = Duration(seconds: 12);
 
-  static Future<http.Response> _get(
-    Uri uri, {
-    Map<String, String>? headers,
-  }) {
+  static Future<http.Response> _get(Uri uri, {Map<String, String>? headers}) {
     return http.get(uri, headers: headers).timeout(requestTimeout);
   }
 
@@ -653,6 +650,20 @@ class ApiService {
         'password': password,
         'phone': phone.trim(),
       }),
+    );
+
+    return Map<String, dynamic>.from(jsonDecode(response.body));
+  }
+
+  static Future<Map<String, dynamic>> requestPasswordReset({
+    required String email,
+  }) async {
+    final uri = Uri.parse('${AppConfig.baseUrl}/forgot-password.php');
+
+    final response = await _post(
+      uri,
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'email': email.trim()}),
     );
 
     return Map<String, dynamic>.from(jsonDecode(response.body));
@@ -900,6 +911,7 @@ class _LoginPageState extends State<LoginPage> {
   final _passwordController = TextEditingController();
 
   bool _isLoading = false;
+  bool _isPasswordVisible = false;
   String _errorMessage = '';
   String _successMessage = '';
   String _deviceUuid = '';
@@ -1039,7 +1051,7 @@ class _LoginPageState extends State<LoginPage> {
                             const SizedBox(height: 16),
                             TextField(
                               controller: _passwordController,
-                              obscureText: true,
+                              obscureText: !_isPasswordVisible,
                               onSubmitted: (_) => _isLoading ? null : _login(),
                               decoration: InputDecoration(
                                 labelText: 'Passwort',
@@ -1047,9 +1059,58 @@ class _LoginPageState extends State<LoginPage> {
                                   borderRadius: BorderRadius.circular(14),
                                 ),
                                 prefixIcon: const Icon(Icons.lock_outline),
+                                suffixIcon: IconButton(
+                                  tooltip: _isPasswordVisible
+                                      ? 'Passwort ausblenden'
+                                      : 'Passwort anzeigen',
+                                  onPressed: () {
+                                    setState(() {
+                                      _isPasswordVisible = !_isPasswordVisible;
+                                    });
+                                  },
+                                  icon: Icon(
+                                    _isPasswordVisible
+                                        ? Icons.visibility_off_outlined
+                                        : Icons.visibility_outlined,
+                                  ),
+                                ),
                               ),
                             ),
-                            const SizedBox(height: 12),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: TextButton.icon(
+                                onPressed: _isLoading
+                                    ? null
+                                    : () async {
+                                        final email =
+                                            await Navigator.of(
+                                              context,
+                                            ).push<String>(
+                                              MaterialPageRoute(
+                                                builder: (_) =>
+                                                    PasswordResetPage(
+                                                      initialEmail:
+                                                          _emailController.text,
+                                                    ),
+                                              ),
+                                            );
+
+                                        if (!mounted || email == null) return;
+
+                                        _emailController.text = email;
+                                        setState(() {
+                                          _errorMessage = '';
+                                          _successMessage =
+                                              'Wenn ein Konto zu dieser E-Mail-Adresse existiert, wurde ein Link zum Zurücksetzen des Passworts versendet.';
+                                        });
+                                      },
+                                icon: const Icon(Icons.lock_reset, size: 20),
+                                label: const Text(
+                                  'Passwort vergessen / zurücksetzen',
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 4),
                             Align(
                               alignment: Alignment.centerLeft,
                               child: SelectableText(
@@ -1163,7 +1224,7 @@ class _LoginPageState extends State<LoginPage> {
                                           setState(() {
                                             _errorMessage = '';
                                             _successMessage =
-                                                'Testzugang erstellt. Bitte jetzt mit deiner E-Mail einloggen.';
+                                                'Registrierung erfolgreich. Bitte bestätigen Sie jetzt Ihre E-Mail-Adresse. Danach können Sie sich einloggen.';
                                           });
                                         }
                                       },
@@ -1186,6 +1247,188 @@ class _LoginPageState extends State<LoginPage> {
   }
 }
 
+class PasswordResetPage extends StatefulWidget {
+  final String initialEmail;
+
+  const PasswordResetPage({super.key, this.initialEmail = ''});
+
+  @override
+  State<PasswordResetPage> createState() => _PasswordResetPageState();
+}
+
+class _PasswordResetPageState extends State<PasswordResetPage> {
+  late final TextEditingController _emailController;
+  bool _isLoading = false;
+  String _errorMessage = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _emailController = TextEditingController(text: widget.initialEmail.trim());
+  }
+
+  Future<void> _requestReset() async {
+    FocusScope.of(context).unfocus();
+
+    final email = _emailController.text.trim();
+    if (email.isEmpty || !email.contains('@')) {
+      setState(() {
+        _errorMessage = 'Bitte geben Sie eine gültige E-Mail-Adresse ein.';
+      });
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = '';
+    });
+
+    try {
+      final data = await ApiService.requestPasswordReset(email: email);
+
+      if (!mounted) return;
+
+      if (data['success'] == true) {
+        Navigator.of(context).pop(email);
+      } else {
+        setState(() {
+          _errorMessage =
+              (data['message'] ?? 'Das Zurücksetzen ist fehlgeschlagen.')
+                  .toString();
+        });
+      }
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage =
+            'Zurücksetzen fehlgeschlagen. Bitte Internet und Server prüfen.';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Passwort zurücksetzen')),
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 500),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: Card(
+                elevation: 4,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.lock_reset, size: 52),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Passwort vergessen?',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 26,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Geben Sie Ihre registrierte E-Mail-Adresse ein. Sie erhalten anschließend einen Link, mit dem Sie ein neues Passwort festlegen können.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.black54, height: 1.4),
+                      ),
+                      const SizedBox(height: 24),
+                      TextField(
+                        controller: _emailController,
+                        keyboardType: TextInputType.emailAddress,
+                        autofillHints: const [AutofillHints.email],
+                        textInputAction: TextInputAction.done,
+                        onSubmitted: (_) => _isLoading ? null : _requestReset(),
+                        decoration: InputDecoration(
+                          labelText: 'E-Mail',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          prefixIcon: const Icon(Icons.email_outlined),
+                        ),
+                      ),
+                      if (_errorMessage.isNotEmpty) ...[
+                        const SizedBox(height: 16),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.red.withValues(alpha: 0.08),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color: Colors.red.withValues(alpha: 0.25),
+                            ),
+                          ),
+                          child: Text(
+                            _errorMessage,
+                            style: const TextStyle(
+                              color: Colors.red,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 20),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 50,
+                        child: ElevatedButton.icon(
+                          onPressed: _isLoading ? null : _requestReset,
+                          icon: _isLoading
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.send_outlined),
+                          label: Text(
+                            _isLoading
+                                ? 'E-Mail wird angefordert...'
+                                : 'Link zum Zurücksetzen senden',
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class RegisterTrialPage extends StatefulWidget {
   const RegisterTrialPage({super.key});
 
@@ -1201,6 +1444,7 @@ class _RegisterTrialPageState extends State<RegisterTrialPage> {
   final _phoneController = TextEditingController();
 
   bool _isLoading = false;
+  bool _isPasswordVisible = false;
   String _message = '';
 
   Future<void> _register() async {
@@ -1224,7 +1468,11 @@ class _RegisterTrialPageState extends State<RegisterTrialPage> {
         if (!mounted) return;
 
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Testzugang erfolgreich erstellt.')),
+          const SnackBar(
+            content: Text(
+              'Registrierung erfolgreich. Bitte bestätigen Sie jetzt Ihre E-Mail-Adresse.',
+            ),
+          ),
         );
 
         Navigator.of(context).pop(_emailController.text.trim());
@@ -1323,13 +1571,28 @@ class _RegisterTrialPageState extends State<RegisterTrialPage> {
                     const SizedBox(height: 16),
                     TextField(
                       controller: _passwordController,
-                      obscureText: true,
+                      obscureText: !_isPasswordVisible,
                       decoration: InputDecoration(
                         labelText: 'Passwort',
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(14),
                         ),
                         prefixIcon: const Icon(Icons.lock_outline),
+                        suffixIcon: IconButton(
+                          tooltip: _isPasswordVisible
+                              ? 'Passwort ausblenden'
+                              : 'Passwort anzeigen',
+                          onPressed: () {
+                            setState(() {
+                              _isPasswordVisible = !_isPasswordVisible;
+                            });
+                          },
+                          icon: Icon(
+                            _isPasswordVisible
+                                ? Icons.visibility_off_outlined
+                                : Icons.visibility_outlined,
+                          ),
+                        ),
                       ),
                     ),
                     const SizedBox(height: 16),

@@ -8,16 +8,12 @@
 	<string>Die Kamera wird verwendet, um Etiketten und Artikelnummern per OCR zu erkennen.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Die Fotobibliothek wird verwendet, um ein vorhandenes Bild eines Etiketts auszuwählen und daraus Artikelnummern per OCR zu erkennen.</string>
-	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>Die App speichert keine Bilder in der Fotobibliothek. Diese Berechtigung wird nur benötigt, falls iOS oder verwendete Bibliotheken das Speichern von Dateien anfordern.</string>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Die ATool App verwendet Standortdaten nicht aktiv. Diese Berechtigung kann durch eingebundene Systemfunktionen oder Bibliotheken erforderlich sein.</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Atool App</string>
+	<string>ATool</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -25,7 +21,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>atool_app</string>
+	<string>ATool</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>

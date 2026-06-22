@@ -24,6 +24,10 @@ workflows:
         script: |
           flutter analyze
 
+      - name: Flutter Tests
+        script: |
+          flutter test
+
       - name: CocoaPods installieren, falls Podfile vorhanden
         script: |
           if [ -f ios/Podfile ]; then
@@ -58,6 +62,7 @@ workflows:
 
     artifacts:
       - build/ios/ipa/*.ipa
+      - build/ios/archive/Runner.xcarchive/dSYMs/**/*.dSYM
       - /tmp/xcodebuild_logs/*.log
     
     publishing:
