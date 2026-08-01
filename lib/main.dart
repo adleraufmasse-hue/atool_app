@@ -16,14 +16,63 @@ import 'package:flutter/services.dart';
 
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 
 import 'dxf_layer_processor.dart';
+import 'ocr_label_rules.dart';
 
-void main() {
+enum AppLanguage {
+  german('de'),
+  english('en');
+
+  final String code;
+
+  const AppLanguage(this.code);
+}
+
+class AppLanguageController extends ValueNotifier<AppLanguage> {
+  static const String _preferenceKey = 'app_language';
+
+  AppLanguageController() : super(AppLanguage.german);
+
+  Future<void> load() async {
+    try {
+      final prefs = SharedPreferencesAsync();
+      final code = await prefs.getString(_preferenceKey);
+      value = code == AppLanguage.english.code
+          ? AppLanguage.english
+          : AppLanguage.german;
+    } catch (_) {
+      value = AppLanguage.german;
+    }
+  }
+
+  Future<void> change(AppLanguage language) async {
+    if (value != language) value = language;
+    try {
+      final prefs = SharedPreferencesAsync();
+      await prefs.setString(_preferenceKey, language.code);
+    } catch (_) {
+      // Die Sprache bleibt für die aktuelle Sitzung trotzdem aktiv.
+    }
+  }
+}
+
+final AppLanguageController appLanguageController = AppLanguageController();
+
+bool get isEnglish => appLanguageController.value == AppLanguage.english;
+
+String tr(String german, String english) => isEnglish ? english : german;
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await appLanguageController.load();
   runApp(const AToolApp());
 }
 
@@ -32,15 +81,25 @@ class AToolApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'ATool',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
-        scaffoldBackgroundColor: const Color(0xFFF5F5F5),
+    return ValueListenableBuilder<AppLanguage>(
+      valueListenable: appLanguageController,
+      builder: (context, language, _) => MaterialApp(
+        title: 'ATool',
+        debugShowCheckedModeBanner: false,
+        locale: Locale(language.code),
+        supportedLocales: const [Locale('de'), Locale('en')],
+        localizationsDelegates: const [
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        theme: ThemeData(
+          useMaterial3: true,
+          colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
+          scaffoldBackgroundColor: const Color(0xFFF5F5F5),
+        ),
+        home: const SplashPage(),
       ),
-      home: const SplashPage(),
     );
   }
 }
@@ -49,6 +108,8 @@ class AppConfig {
   static const String baseUrl = 'https://adler-aufmasse.de/licensing/api';
   static const String catalogUrl =
       'https://adler-aufmasse.de/wp-json/adler/v1/catalog';
+  static const String frankeLabelMappingAsset =
+      'assets/data/franke_label_mapping.json';
   static const String dwgListUrl =
       'https://adler-aufmasse.de/wp-json/adler/v1/dwg-list';
   static const String logUrl =
@@ -130,6 +191,7 @@ class AppStorage {
 class LicenseCheckPrefs {
   static const String lastSuccessfulCheckKey = 'license_last_successful_check';
   static const Duration checkInterval = Duration(hours: 24);
+  static const Duration offlineGracePeriod = Duration(days: 30);
 
   static Future<bool> isCheckDue() async {
     final prefs = SharedPreferencesAsync();
@@ -147,6 +209,33 @@ class LicenseCheckPrefs {
       lastSuccessfulCheckKey,
       DateTime.now().millisecondsSinceEpoch,
     );
+  }
+
+  static Future<bool> isWithinOfflineGracePeriod() async {
+    final lastCheck = await getLastSuccessfulCheck();
+    if (lastCheck == null || lastCheck <= 0) return false;
+
+    final lastCheckTime = DateTime.fromMillisecondsSinceEpoch(lastCheck);
+    final elapsed = DateTime.now().difference(lastCheckTime);
+    return !elapsed.isNegative && elapsed <= offlineGracePeriod;
+  }
+
+  static Future<int?> getLastSuccessfulCheck() async {
+    final prefs = SharedPreferencesAsync();
+    return prefs.getInt(lastSuccessfulCheckKey);
+  }
+
+  static Future<int> getOfflineDaysRemaining() async {
+    final lastCheck = await getLastSuccessfulCheck();
+    if (lastCheck == null || lastCheck <= 0) return 0;
+
+    final elapsed = DateTime.now().difference(
+      DateTime.fromMillisecondsSinceEpoch(lastCheck),
+    );
+    if (elapsed.isNegative || elapsed >= offlineGracePeriod) return 0;
+
+    final remaining = offlineGracePeriod - elapsed;
+    return (remaining.inHours / 24).ceil();
   }
 
   static Future<void> clear() async {
@@ -298,6 +387,12 @@ class CatalogCachePrefs {
     );
   }
 
+  static Future<DateTime?> getCatalogCachedAt() async {
+    final prefs = SharedPreferencesAsync();
+    final value = await prefs.getInt(catalogCachedAtKey);
+    return value == null ? null : DateTime.fromMillisecondsSinceEpoch(value);
+  }
+
   static Future<int?> getDwgDisplayCount() async {
     final prefs = SharedPreferencesAsync();
     return await prefs.getInt(dwgDisplayCountKey);
@@ -359,6 +454,282 @@ class CatalogItem {
       dwgPath != null ? '${AppConfig.mediaBaseUrl}$dwgPath' : null;
 }
 
+class FrankeLabelMapping {
+  final String catalog;
+  final String materialText;
+  final String label;
+
+  const FrankeLabelMapping({
+    required this.catalog,
+    required this.materialText,
+    required this.label,
+  });
+
+  factory FrankeLabelMapping.fromJson(Map<String, dynamic> json) {
+    return FrankeLabelMapping(
+      catalog: (json['catalog'] ?? '').toString(),
+      materialText: (json['material_text'] ?? '').toString(),
+      label: (json['label'] ?? '').toString(),
+    );
+  }
+}
+
+Map<String, Object> _saveReducedOfflineImageInBackground(
+  Map<String, Object> input,
+) {
+  final bytes = input['bytes']! as Uint8List;
+  final outputPath = input['outputPath']! as String;
+
+  try {
+    final decoded = img.decodeImage(bytes);
+    if (decoded == null) return {'success': false, 'size': 0};
+
+    // Offline-Vorschauen werden auf 60 % der ursprünglichen Abmessungen
+    // reduziert. Das Originalbild bleibt ausschließlich auf dem Server.
+    final width = (decoded.width * 0.6).round();
+    final height = (decoded.height * 0.6).round();
+    final reduced = img.copyResize(
+      decoded,
+      width: width < 1 ? 1 : width,
+      height: height < 1 ? 1 : height,
+      interpolation: img.Interpolation.linear,
+    );
+    final encoded = img.encodeJpg(reduced, quality: 72);
+    File(outputPath).writeAsBytesSync(encoded, flush: true);
+
+    return {'success': true, 'size': encoded.length};
+  } catch (_) {
+    try {
+      final file = File(outputPath);
+      if (file.existsSync()) file.deleteSync();
+    } catch (_) {}
+    return {'success': false, 'size': 0};
+  }
+}
+
+class OfflineImageStatus {
+  final int imageCount;
+  final int totalBytes;
+  final DateTime? lastUpdated;
+
+  const OfflineImageStatus({
+    required this.imageCount,
+    required this.totalBytes,
+    required this.lastUpdated,
+  });
+}
+
+class OfflineImageSyncResult {
+  final int total;
+  final int available;
+  final int failed;
+  final bool cancelled;
+
+  const OfflineImageSyncResult({
+    required this.total,
+    required this.available,
+    required this.failed,
+    required this.cancelled,
+  });
+}
+
+typedef OfflineImageProgressCallback =
+    void Function(int processed, int total, int available, int failed);
+
+class OfflineImageSyncCancellation {
+  bool isCancelled = false;
+  http.Client? _client;
+
+  void _attach(http.Client client) => _client = client;
+
+  void cancel() {
+    isCancelled = true;
+    _client?.close();
+  }
+}
+
+class OfflineImageStore {
+  static const String _directoryName = 'offline_article_images';
+  static const String _lastUpdatedKey = 'offline_images_last_updated';
+
+  static Future<Directory> _directory() async {
+    final root = await getApplicationSupportDirectory();
+    final directory = Directory(
+      '${root.path}${Platform.pathSeparator}$_directoryName',
+    );
+    if (!await directory.exists()) await directory.create(recursive: true);
+    return directory;
+  }
+
+  static String _fileNameForUrl(String url) {
+    int hash(Iterable<int> units) {
+      var value = 0x811C9DC5;
+      for (final unit in units) {
+        value ^= unit;
+        value = (value * 0x01000193) & 0xFFFFFFFF;
+      }
+      return value;
+    }
+
+    final first = hash(url.codeUnits).toRadixString(16).padLeft(8, '0');
+    final second = hash(
+      url.codeUnits.reversed,
+    ).toRadixString(16).padLeft(8, '0');
+    return '$first$second.jpg';
+  }
+
+  static Future<String> _pathForUrl(String url) async {
+    final directory = await _directory();
+    return '${directory.path}${Platform.pathSeparator}${_fileNameForUrl(url)}';
+  }
+
+  static Future<String?> existingPathForUrl(String url) async {
+    if (url.trim().isEmpty) return null;
+    try {
+      final path = await _pathForUrl(url);
+      final file = File(path);
+      if (await file.exists() && await file.length() > 0) return path;
+    } catch (_) {}
+    return null;
+  }
+
+  static Future<OfflineImageStatus> getStatus() async {
+    var count = 0;
+    var bytes = 0;
+
+    try {
+      final directory = await _directory();
+      await for (final entity in directory.list()) {
+        if (entity is! File || !entity.path.toLowerCase().endsWith('.jpg')) {
+          continue;
+        }
+        count++;
+        bytes += await entity.length();
+      }
+    } catch (_) {}
+
+    final prefs = SharedPreferencesAsync();
+    final lastUpdatedValue = await prefs.getInt(_lastUpdatedKey);
+    return OfflineImageStatus(
+      imageCount: count,
+      totalBytes: bytes,
+      lastUpdated: lastUpdatedValue == null
+          ? null
+          : DateTime.fromMillisecondsSinceEpoch(lastUpdatedValue),
+    );
+  }
+
+  static Future<OfflineImageSyncResult> synchronize(
+    List<CatalogItem> catalog, {
+    required OfflineImageProgressCallback onProgress,
+    required OfflineImageSyncCancellation cancellation,
+  }) async {
+    final urls = catalog
+        .where((item) => item.jpgExists)
+        .map((item) => item.jpgUrl?.trim() ?? '')
+        .where((url) => url.isNotEmpty)
+        .toSet()
+        .toList();
+    final total = urls.length;
+    final directory = await _directory();
+    final expectedFiles = urls.map(_fileNameForUrl).toSet();
+    var processed = 0;
+    var available = 0;
+    var failed = 0;
+    var nextIndex = 0;
+    final client = http.Client();
+    cancellation._attach(client);
+
+    Future<void> worker() async {
+      while (!cancellation.isCancelled) {
+        if (nextIndex >= urls.length) return;
+        final url = urls[nextIndex++];
+        final path =
+            '${directory.path}${Platform.pathSeparator}${_fileNameForUrl(url)}';
+        final file = File(path);
+
+        try {
+          if (await file.exists() && await file.length() > 0) {
+            available++;
+          } else {
+            final response = await client
+                .get(Uri.parse(url))
+                .timeout(const Duration(seconds: 20));
+            if (response.statusCode != 200 || response.bodyBytes.isEmpty) {
+              failed++;
+            } else {
+              final result = await compute(
+                _saveReducedOfflineImageInBackground,
+                {'bytes': response.bodyBytes, 'outputPath': path},
+              );
+              if (result['success'] == true) {
+                available++;
+              } else {
+                failed++;
+              }
+            }
+          }
+        } catch (_) {
+          if (!cancellation.isCancelled) failed++;
+        }
+
+        processed++;
+        onProgress(processed, total, available, failed);
+      }
+    }
+
+    await Future.wait(List.generate(3, (_) => worker()));
+
+    client.close();
+    cancellation._client = null;
+
+    final cancelled = cancellation.isCancelled;
+    if (!cancelled) {
+      try {
+        await for (final entity in directory.list()) {
+          if (entity is File) {
+            final name = entity.uri.pathSegments.last;
+            if (name.endsWith('.jpg') && !expectedFiles.contains(name)) {
+              await entity.delete();
+            }
+          }
+        }
+      } catch (_) {}
+
+      final prefs = SharedPreferencesAsync();
+      await prefs.setInt(
+        _lastUpdatedKey,
+        DateTime.now().millisecondsSinceEpoch,
+      );
+    }
+
+    return OfflineImageSyncResult(
+      total: total,
+      available: available,
+      failed: failed,
+      cancelled: cancelled,
+    );
+  }
+
+  static Future<void> clear() async {
+    try {
+      final directory = await _directory();
+      await for (final entity in directory.list()) {
+        if (entity is File) await entity.delete();
+      }
+    } catch (_) {}
+
+    final prefs = SharedPreferencesAsync();
+    await prefs.remove(_lastUpdatedKey);
+  }
+}
+
+String _formatStorageSize(int bytes) {
+  if (bytes < 1024) return '$bytes B';
+  if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+  return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+}
+
 List<CatalogItem> _parseCatalogItemsInBackground(String responseBody) {
   final data = jsonDecode(responseBody) as Map<String, dynamic>;
   final itemsRaw = (data['items'] as List<dynamic>? ?? []);
@@ -366,6 +737,19 @@ List<CatalogItem> _parseCatalogItemsInBackground(String responseBody) {
   return itemsRaw
       .whereType<Map>()
       .map((e) => CatalogItem.fromJson(Map<String, dynamic>.from(e)))
+      .toList();
+}
+
+List<FrankeLabelMapping> _parseFrankeLabelMappingsInBackground(
+  String responseBody,
+) {
+  final data = jsonDecode(responseBody);
+  final itemsRaw = data is List ? data : const [];
+
+  return itemsRaw
+      .whereType<Map>()
+      .map((e) => FrankeLabelMapping.fromJson(Map<String, dynamic>.from(e)))
+      .where((e) => e.catalog.trim().isNotEmpty && e.label.trim().isNotEmpty)
       .toList();
 }
 
@@ -381,6 +765,72 @@ int? _parseDwgDisplayCountInBackground(String responseBody) {
   if (data is List) return data.length;
 
   return null;
+}
+
+Map<String, Object> _prepareOcrInputImageInBackground(
+  Map<String, Object> input,
+) {
+  final originalPath = input['path']! as String;
+  final maxOcrImageSide = input['maxSide']! as int;
+
+  try {
+    final bytes = File(originalPath).readAsBytesSync();
+    final decoded = img.decodeImage(bytes);
+
+    if (decoded == null) {
+      return {'path': originalPath, 'isTemporary': false};
+    }
+
+    final longestSide = decoded.width > decoded.height
+        ? decoded.width
+        : decoded.height;
+
+    if (longestSide <= maxOcrImageSide) {
+      return {'path': originalPath, 'isTemporary': false};
+    }
+
+    final scale = maxOcrImageSide / longestSide;
+    final resized = img.copyResize(
+      decoded,
+      width: (decoded.width * scale).round(),
+      height: (decoded.height * scale).round(),
+      interpolation: img.Interpolation.linear,
+    );
+    final resizedPath =
+        '${Directory.systemTemp.path}/atool_ocr_resized_${DateTime.now().microsecondsSinceEpoch}.jpg';
+
+    File(resizedPath).writeAsBytesSync(img.encodeJpg(resized, quality: 88));
+
+    return {'path': resizedPath, 'isTemporary': true};
+  } catch (e) {
+    return {'path': originalPath, 'isTemporary': false, 'error': e.toString()};
+  }
+}
+
+List<Map<String, Object>> _buildFallbackOcrImageVariantsInBackground(
+  String originalPath,
+) {
+  final variants = <Map<String, Object>>[];
+
+  try {
+    final bytes = File(originalPath).readAsBytesSync();
+    final decoded = img.decodeImage(bytes);
+
+    if (decoded == null) return variants;
+
+    for (final rotation in [180, 90, 270]) {
+      final rotated = img.copyRotate(decoded, angle: rotation);
+      final rotatedPath =
+          '${Directory.systemTemp.path}/atool_ocr_rotated_${rotation}_${DateTime.now().microsecondsSinceEpoch}.jpg';
+
+      File(rotatedPath).writeAsBytesSync(img.encodeJpg(rotated, quality: 88));
+      variants.add({'path': rotatedPath, 'rotation': rotation});
+    }
+  } catch (e) {
+    debugPrint('OCR ROTATION FAILED: $e');
+  }
+
+  return variants;
 }
 
 class CatalogSearchEntry {
@@ -415,10 +865,24 @@ class _CatalogIndexBuildResult {
   });
 }
 
+class _CatalogIndexBuildInput {
+  final List<CatalogItem> catalog;
+  final List<FrankeLabelMapping> frankeLabelMappings;
+
+  const _CatalogIndexBuildInput({
+    required this.catalog,
+    required this.frankeLabelMappings,
+  });
+}
+
 _CatalogIndexBuildResult _buildCatalogSearchIndexInBackground(
-  List<CatalogItem> catalog,
+  _CatalogIndexBuildInput input,
 ) {
   const minSearchLen = 4;
+  final catalog = input.catalog;
+  final frankeLabelsByCatalogKey = _buildFrankeLabelsByCatalogKey(
+    input.frankeLabelMappings,
+  );
   final searchEntries = <CatalogSearchEntry>[];
   final ocrLookupIndex = <String, List<CatalogItem>>{};
 
@@ -437,12 +901,17 @@ _CatalogIndexBuildResult _buildCatalogSearchIndexInBackground(
   }
 
   for (final item in catalog) {
+    final frankeLabelFields = _frankeLabelFieldsForItem(
+      item,
+      frankeLabelsByCatalogKey,
+    );
     final rawFields = <String>[
       item.basename,
       item.id,
       item.dwgPath ?? '',
       item.dxfPath ?? '',
       item.jpgPath ?? '',
+      ...frankeLabelFields,
     ].where((e) => e.trim().isNotEmpty).toList();
 
     final manualRawFields = <String>[
@@ -509,6 +978,78 @@ _CatalogIndexBuildResult _buildCatalogSearchIndexInBackground(
   );
 }
 
+Map<String, List<String>> _buildFrankeLabelsByCatalogKey(
+  List<FrankeLabelMapping> mappings,
+) {
+  final labelsByCatalogKey = <String, List<String>>{};
+
+  void addLabel(String catalogValue, String labelValue) {
+    final label = labelValue.trim();
+    if (label.isEmpty) return;
+
+    for (final key in _buildFrankeArticleKeys(catalogValue)) {
+      final labels = labelsByCatalogKey.putIfAbsent(key, () => []);
+      if (!labels.contains(label)) labels.add(label);
+    }
+  }
+
+  for (final mapping in mappings) {
+    addLabel(mapping.catalog, mapping.label);
+  }
+
+  return labelsByCatalogKey;
+}
+
+List<String> _frankeLabelFieldsForItem(
+  CatalogItem item,
+  Map<String, List<String>> labelsByCatalogKey,
+) {
+  final labels = <String>[];
+
+  for (final value in [
+    item.id,
+    item.basename,
+    item.dwgPath ?? '',
+    item.dxfPath ?? '',
+    item.jpgPath ?? '',
+  ]) {
+    for (final key in _buildFrankeArticleKeys(value)) {
+      final foundLabels = labelsByCatalogKey[key];
+      if (foundLabels == null) continue;
+
+      for (final label in foundLabels) {
+        if (!labels.contains(label)) labels.add(label);
+      }
+    }
+  }
+
+  return labels;
+}
+
+Set<String> _buildFrankeArticleKeys(String input) {
+  final normalized = _normalizeCatalogSearchText(input);
+  final compact = normalized.replaceAll(RegExp(r'[^a-z0-9]'), '');
+  final keys = <String>{};
+
+  if (normalized.length >= 4) keys.add(normalized);
+  if (compact.length >= 4) keys.add(compact);
+
+  for (final match in RegExp(
+    r'\d{2,5}[.\-\/]\d{2,6}([.\-\/]\d{2,6})+',
+  ).allMatches(normalized)) {
+    final value = match.group(0);
+    if (value == null) continue;
+
+    final article = _normalizeCatalogSearchText(value);
+    final articleCompact = article.replaceAll(RegExp(r'[^a-z0-9]'), '');
+
+    if (article.length >= 4) keys.add(article);
+    if (articleCompact.length >= 4) keys.add(articleCompact);
+  }
+
+  return keys;
+}
+
 String _normalizeCatalogSearchText(String input) {
   var s = input.toLowerCase().trim();
 
@@ -556,7 +1097,7 @@ class DeviceMetaService {
     final packageInfo = await PackageInfo.fromPlatform();
 
     String platformName = 'unknown';
-    String deviceName = 'Unbekanntes Gerät';
+    String deviceName = tr('Unbekanntes Gerät', 'Unknown device');
     String osVersion = 'Unbekannt';
     final appVersion = '${packageInfo.version}+${packageInfo.buildNumber}';
 
@@ -771,28 +1312,36 @@ String mapLoginErrorMessage(Map<String, dynamic> data) {
   final message = (data['message'] ?? '').toString();
 
   if (message.contains('Passwort ist falsch')) {
-    return 'Das Passwort ist falsch.';
+    return tr('Das Passwort ist falsch.', 'The password is incorrect.');
   }
   if (message.contains('Benutzer nicht gefunden')) {
-    return 'Dieser Benutzer wurde nicht gefunden.';
+    return tr('Dieser Benutzer wurde nicht gefunden.', 'User not found.');
   }
   if (message.contains('Benutzer ist gesperrt')) {
-    return 'Dieser Benutzer ist gesperrt.';
+    return tr('Dieser Benutzer ist gesperrt.', 'This user is blocked.');
   }
   if (message.contains('Firma ist nicht aktiv')) {
-    return 'Die Firma ist aktuell nicht aktiv.';
+    return tr(
+      'Die Firma ist aktuell nicht aktiv.',
+      'The company is currently inactive.',
+    );
   }
   if (message.contains('Lizenz ist abgelaufen')) {
-    return 'Die Lizenz ist abgelaufen.';
+    return tr('Die Lizenz ist abgelaufen.', 'The license has expired.');
   }
   if (message.contains('Maximale Anzahl aktiver Geräte erreicht')) {
-    return 'Die maximale Anzahl aktiver Geräte wurde erreicht.';
+    return tr(
+      'Die maximale Anzahl aktiver Geräte wurde erreicht.',
+      'The maximum number of active devices has been reached.',
+    );
   }
   if (message.contains('Gerät ist nicht aktiv')) {
-    return 'Dieses Gerät ist nicht aktiv.';
+    return tr('Dieses Gerät ist nicht aktiv.', 'This device is inactive.');
   }
 
-  return message.isNotEmpty ? message : 'Unbekannter Login-Fehler.';
+  return message.isNotEmpty
+      ? message
+      : tr('Unbekannter Login-Fehler.', 'Unknown login error.');
 }
 
 Color statusColor(String status) {
@@ -857,8 +1406,10 @@ class _SplashPageState extends State<SplashPage> {
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(
               builder: (_) => LoginPage(
-                initialErrorMessage:
-                    'Sitzung oder Lizenz ist nicht mehr gueltig. Bitte erneut anmelden.',
+                initialErrorMessage: tr(
+                  'Sitzung oder Lizenz ist nicht mehr gültig. Bitte erneut anmelden.',
+                  'The session or license is no longer valid. Please log in again.',
+                ),
               ),
             ),
           );
@@ -877,14 +1428,24 @@ class _SplashPageState extends State<SplashPage> {
         ).pushReplacement(MaterialPageRoute(builder: (_) => const LoginPage()));
       }
     } catch (_) {
+      if (await LicenseCheckPrefs.isWithinOfflineGracePeriod()) {
+        if (!mounted) return;
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const MainSearchPage()),
+        );
+        return;
+      }
+
       await AppStorage.clearTokens();
 
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
-          builder: (_) => const LoginPage(
-            initialErrorMessage:
-                'Lizenz konnte nicht geprueft werden. Bitte erneut anmelden.',
+          builder: (_) => LoginPage(
+            initialErrorMessage: tr(
+              'Lizenz konnte nicht geprüft werden. Bitte erneut anmelden.',
+              'The license could not be verified. Please log in again.',
+            ),
           ),
         ),
       );
@@ -975,8 +1536,10 @@ class _LoginPageState extends State<LoginPage> {
       if (!mounted) return;
 
       setState(() {
-        _errorMessage =
-            'Verbindung fehlgeschlagen. Bitte Internet und Server prüfen.';
+        _errorMessage = tr(
+          'Verbindung fehlgeschlagen. Bitte Internet und Server prüfen.',
+          'Connection failed. Please check your internet connection and the server.',
+        );
       });
     } finally {
       if (mounted) {
@@ -1032,8 +1595,11 @@ class _LoginPageState extends State<LoginPage> {
                             ),
                             const SizedBox(height: 12),
                             const SizedBox(height: 6),
-                            const Text(
-                              'Login für lizenzierte Firmenkunden',
+                            Text(
+                              tr(
+                                'Login für lizenzierte Firmenkunden',
+                                'Login for licensed business customers',
+                              ),
                               textAlign: TextAlign.center,
                               style: TextStyle(color: Colors.black54),
                             ),
@@ -1054,15 +1620,21 @@ class _LoginPageState extends State<LoginPage> {
                               obscureText: !_isPasswordVisible,
                               onSubmitted: (_) => _isLoading ? null : _login(),
                               decoration: InputDecoration(
-                                labelText: 'Passwort',
+                                labelText: tr('Passwort', 'Password'),
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(14),
                                 ),
                                 prefixIcon: const Icon(Icons.lock_outline),
                                 suffixIcon: IconButton(
                                   tooltip: _isPasswordVisible
-                                      ? 'Passwort ausblenden'
-                                      : 'Passwort anzeigen',
+                                      ? tr(
+                                          'Passwort ausblenden',
+                                          'Hide password',
+                                        )
+                                      : tr(
+                                          'Passwort anzeigen',
+                                          'Show password',
+                                        ),
                                   onPressed: () {
                                     setState(() {
                                       _isPasswordVisible = !_isPasswordVisible;
@@ -1100,13 +1672,18 @@ class _LoginPageState extends State<LoginPage> {
                                         _emailController.text = email;
                                         setState(() {
                                           _errorMessage = '';
-                                          _successMessage =
-                                              'Wenn ein Konto zu dieser E-Mail-Adresse existiert, wurde ein Link zum Zurücksetzen des Passworts versendet.';
+                                          _successMessage = tr(
+                                            'Wenn ein Konto zu dieser E-Mail-Adresse existiert, wurde ein Link zum Zurücksetzen des Passworts versendet.',
+                                            'If an account exists for this email address, a password reset link has been sent.',
+                                          );
                                         });
                                       },
                                 icon: const Icon(Icons.lock_reset, size: 20),
-                                label: const Text(
-                                  'Passwort vergessen / zurücksetzen',
+                                label: Text(
+                                  tr(
+                                    'Passwort vergessen / zurücksetzen',
+                                    'Forgot/reset password',
+                                  ),
                                 ),
                               ),
                             ),
@@ -1114,7 +1691,7 @@ class _LoginPageState extends State<LoginPage> {
                             Align(
                               alignment: Alignment.centerLeft,
                               child: SelectableText(
-                                'Geräte-ID: ${_deviceUuid.isEmpty ? "wird geladen..." : _deviceUuid}',
+                                '${tr('Geräte-ID', 'Device ID')}: ${_deviceUuid.isEmpty ? tr('wird geladen...', 'loading...') : _deviceUuid}',
                                 style: const TextStyle(
                                   fontSize: 11,
                                   color: Colors.black54,
@@ -1180,8 +1757,11 @@ class _LoginPageState extends State<LoginPage> {
                                     : const Icon(Icons.login),
                                 label: Text(
                                   _isLoading
-                                      ? 'Anmeldung läuft...'
-                                      : 'Einloggen',
+                                      ? tr(
+                                          'Anmeldung läuft...',
+                                          'Logging in...',
+                                        )
+                                      : tr('Einloggen', 'Log in'),
                                 ),
                                 style: ElevatedButton.styleFrom(
                                   shape: RoundedRectangleBorder(
@@ -1193,9 +1773,11 @@ class _LoginPageState extends State<LoginPage> {
                             const SizedBox(height: 12),
 
                             if (!selfRegistrationAvailable)
-                              const Text(
-                                'Zugang nur für bereits freigeschaltete Firmenkunden.\n'
-                                'Bitte verwenden Sie die Zugangsdaten, die Ihnen von Ihrem Unternehmen bereitgestellt wurden.',
+                              Text(
+                                tr(
+                                  'Zugang nur für bereits freigeschaltete Firmenkunden.\nBitte verwenden Sie die Zugangsdaten, die Ihnen von Ihrem Unternehmen bereitgestellt wurden.',
+                                  'Access is limited to approved business customers.\nPlease use the login details provided by your company.',
+                                ),
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
                                   fontSize: 13,
@@ -1223,13 +1805,18 @@ class _LoginPageState extends State<LoginPage> {
                                           _emailController.text = result;
                                           setState(() {
                                             _errorMessage = '';
-                                            _successMessage =
-                                                'Registrierung erfolgreich. Bitte bestätigen Sie jetzt Ihre E-Mail-Adresse. Danach können Sie sich einloggen.';
+                                            _successMessage = tr(
+                                              'Registrierung erfolgreich. Bitte bestätigen Sie jetzt Ihre E-Mail-Adresse. Danach können Sie sich einloggen.',
+                                              'Registration successful. Please confirm your email address. You can then log in.',
+                                            );
                                           });
                                         }
                                       },
-                                child: const Text(
-                                  '10 Tage testen / Registrieren',
+                                child: Text(
+                                  tr(
+                                    '10 Tage testen / Registrieren',
+                                    'Try for 10 days / Register',
+                                  ),
                                 ),
                               ),
                           ],
@@ -1273,7 +1860,10 @@ class _PasswordResetPageState extends State<PasswordResetPage> {
     final email = _emailController.text.trim();
     if (email.isEmpty || !email.contains('@')) {
       setState(() {
-        _errorMessage = 'Bitte geben Sie eine gültige E-Mail-Adresse ein.';
+        _errorMessage = tr(
+          'Bitte geben Sie eine gültige E-Mail-Adresse ein.',
+          'Please enter a valid email address.',
+        );
       });
       return;
     }
@@ -1293,15 +1883,21 @@ class _PasswordResetPageState extends State<PasswordResetPage> {
       } else {
         setState(() {
           _errorMessage =
-              (data['message'] ?? 'Das Zurücksetzen ist fehlgeschlagen.')
+              (data['message'] ??
+                      tr(
+                        'Das Zurücksetzen ist fehlgeschlagen.',
+                        'The reset request failed.',
+                      ))
                   .toString();
         });
       }
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _errorMessage =
-            'Zurücksetzen fehlgeschlagen. Bitte Internet und Server prüfen.';
+        _errorMessage = tr(
+          'Zurücksetzen fehlgeschlagen. Bitte Internet und Server prüfen.',
+          'Reset failed. Please check your internet connection and the server.',
+        );
       });
     } finally {
       if (mounted) {
@@ -1321,7 +1917,9 @@ class _PasswordResetPageState extends State<PasswordResetPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Passwort zurücksetzen')),
+      appBar: AppBar(
+        title: Text(tr('Passwort zurücksetzen', 'Reset password')),
+      ),
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
@@ -1340,8 +1938,8 @@ class _PasswordResetPageState extends State<PasswordResetPage> {
                     children: [
                       const Icon(Icons.lock_reset, size: 52),
                       const SizedBox(height: 16),
-                      const Text(
-                        'Passwort vergessen?',
+                      Text(
+                        tr('Passwort vergessen?', 'Forgot your password?'),
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 26,
@@ -1349,8 +1947,11 @@ class _PasswordResetPageState extends State<PasswordResetPage> {
                         ),
                       ),
                       const SizedBox(height: 8),
-                      const Text(
-                        'Geben Sie Ihre registrierte E-Mail-Adresse ein. Sie erhalten anschließend einen Link, mit dem Sie ein neues Passwort festlegen können.',
+                      Text(
+                        tr(
+                          'Geben Sie Ihre registrierte E-Mail-Adresse ein. Sie erhalten anschließend einen Link, mit dem Sie ein neues Passwort festlegen können.',
+                          'Enter your registered email address. You will receive a link that lets you set a new password.',
+                        ),
                         textAlign: TextAlign.center,
                         style: TextStyle(color: Colors.black54, height: 1.4),
                       ),
@@ -1407,8 +2008,14 @@ class _PasswordResetPageState extends State<PasswordResetPage> {
                               : const Icon(Icons.send_outlined),
                           label: Text(
                             _isLoading
-                                ? 'E-Mail wird angefordert...'
-                                : 'Link zum Zurücksetzen senden',
+                                ? tr(
+                                    'E-Mail wird angefordert...',
+                                    'Requesting email...',
+                                  )
+                                : tr(
+                                    'Link zum Zurücksetzen senden',
+                                    'Send reset link',
+                                  ),
                           ),
                           style: ElevatedButton.styleFrom(
                             shape: RoundedRectangleBorder(
@@ -1468,9 +2075,12 @@ class _RegisterTrialPageState extends State<RegisterTrialPage> {
         if (!mounted) return;
 
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Text(
-              'Registrierung erfolgreich. Bitte bestätigen Sie jetzt Ihre E-Mail-Adresse.',
+              tr(
+                'Registrierung erfolgreich. Bitte bestätigen Sie jetzt Ihre E-Mail-Adresse.',
+                'Registration successful. Please confirm your email address.',
+              ),
             ),
           ),
         );
@@ -1478,14 +2088,21 @@ class _RegisterTrialPageState extends State<RegisterTrialPage> {
         Navigator.of(context).pop(_emailController.text.trim());
       } else {
         setState(() {
-          _message = (data['message'] ?? 'Registrierung fehlgeschlagen.')
-              .toString();
+          _message =
+              (data['message'] ??
+                      tr(
+                        'Registrierung fehlgeschlagen.',
+                        'Registration failed.',
+                      ))
+                  .toString();
         });
       }
     } catch (_) {
       setState(() {
-        _message =
-            'Registrierung fehlgeschlagen. Bitte Serververbindung prüfen.';
+        _message = tr(
+          'Registrierung fehlgeschlagen. Bitte Serververbindung prüfen.',
+          'Registration failed. Please check the server connection.',
+        );
       });
     } finally {
       setState(() {
@@ -1507,7 +2124,7 @@ class _RegisterTrialPageState extends State<RegisterTrialPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('10 Tage testen')),
+      appBar: AppBar(title: Text(tr('10 Tage testen', '10-day trial'))),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 500),
@@ -1522,16 +2139,19 @@ class _RegisterTrialPageState extends State<RegisterTrialPage> {
                 padding: const EdgeInsets.all(24),
                 child: Column(
                   children: [
-                    const Text(
-                      'Testzugang registrieren',
+                    Text(
+                      tr('Testzugang registrieren', 'Register a trial account'),
                       style: TextStyle(
                         fontSize: 26,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                     const SizedBox(height: 8),
-                    const Text(
-                      'Erstelle einen Firmen-Testzugang für 10 Tage.',
+                    Text(
+                      tr(
+                        'Erstelle einen Firmen-Testzugang für 10 Tage.',
+                        'Create a 10-day company trial account.',
+                      ),
                       textAlign: TextAlign.center,
                       style: TextStyle(color: Colors.black54),
                     ),
@@ -1539,7 +2159,7 @@ class _RegisterTrialPageState extends State<RegisterTrialPage> {
                     TextField(
                       controller: _companyController,
                       decoration: InputDecoration(
-                        labelText: 'Firmenname',
+                        labelText: tr('Firmenname', 'Company name'),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(14),
                         ),
@@ -1550,7 +2170,7 @@ class _RegisterTrialPageState extends State<RegisterTrialPage> {
                     TextField(
                       controller: _nameController,
                       decoration: InputDecoration(
-                        labelText: 'Ansprechpartner',
+                        labelText: tr('Ansprechpartner', 'Contact person'),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(14),
                         ),
@@ -1573,15 +2193,15 @@ class _RegisterTrialPageState extends State<RegisterTrialPage> {
                       controller: _passwordController,
                       obscureText: !_isPasswordVisible,
                       decoration: InputDecoration(
-                        labelText: 'Passwort',
+                        labelText: tr('Passwort', 'Password'),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(14),
                         ),
                         prefixIcon: const Icon(Icons.lock_outline),
                         suffixIcon: IconButton(
                           tooltip: _isPasswordVisible
-                              ? 'Passwort ausblenden'
-                              : 'Passwort anzeigen',
+                              ? tr('Passwort ausblenden', 'Hide password')
+                              : tr('Passwort anzeigen', 'Show password'),
                           onPressed: () {
                             setState(() {
                               _isPasswordVisible = !_isPasswordVisible;
@@ -1599,7 +2219,7 @@ class _RegisterTrialPageState extends State<RegisterTrialPage> {
                     TextField(
                       controller: _phoneController,
                       decoration: InputDecoration(
-                        labelText: 'Telefon (optional)',
+                        labelText: tr('Telefon (optional)', 'Phone (optional)'),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(14),
                         ),
@@ -1644,8 +2264,11 @@ class _RegisterTrialPageState extends State<RegisterTrialPage> {
                             : const Icon(Icons.app_registration),
                         label: Text(
                           _isLoading
-                              ? 'Registrierung läuft...'
-                              : 'Testzugang erstellen',
+                              ? tr('Registrierung läuft...', 'Registering...')
+                              : tr(
+                                  'Testzugang erstellen',
+                                  'Create trial account',
+                                ),
                         ),
                         style: ElevatedButton.styleFrom(
                           shape: RoundedRectangleBorder(
@@ -1729,6 +2352,7 @@ class _MainSearchPageState extends State<MainSearchPage>
   bool _showOcrSuggestions = false;
   bool _ocrSearchActive = false;
   bool _ocrCancelRequested = false;
+  bool _resultChromeCollapsed = false;
   int _ocrRunId = 0;
 
   String _message = '';
@@ -1742,10 +2366,14 @@ class _MainSearchPageState extends State<MainSearchPage>
   int _catalogIndexBuildRunId = 0;
 
   List<CatalogItem> _catalog = [];
+  List<FrankeLabelMapping> _frankeLabelMappings = [];
+  Set<String> _catalogManufacturers = {};
   List<CatalogSearchEntry> _catalogSearchIndex = [];
   Map<String, List<CatalogItem>> _ocrLookupIndex = {};
   List<CatalogItem> _results = [];
   String _activeHighlightTerm = '';
+  bool _showSinkLabelMatchWarning = false;
+  String _recognizedSinkLabelNumber = '';
   List<String> _ocrBoxTexts = [];
   int? _totalCount;
   int? _dwgDisplayCount;
@@ -1756,6 +2384,7 @@ class _MainSearchPageState extends State<MainSearchPage>
     WidgetsBinding.instance.addObserver(this);
     _initPage();
     _searchController.addListener(_onSearchChanged);
+    _searchFocusNode.addListener(_onSearchFocusChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       FocusManager.instance.primaryFocus?.unfocus();
@@ -1769,8 +2398,11 @@ class _MainSearchPageState extends State<MainSearchPage>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _ocrCancelRequested = true;
+    _ocrRunId++;
     _debounce?.cancel();
     _startupFocusGuardTimer?.cancel();
+    _searchFocusNode.removeListener(_onSearchFocusChanged);
     _searchController.dispose();
     _searchFocusNode.dispose();
     super.dispose();
@@ -1803,6 +2435,8 @@ class _MainSearchPageState extends State<MainSearchPage>
   }
 
   Future<void> _loadInitialCatalog() async {
+    await _loadFrankeLabelMappings();
+
     await _loadCachedIndex().timeout(
       const Duration(seconds: 2),
       onTimeout: () => false,
@@ -1832,8 +2466,10 @@ class _MainSearchPageState extends State<MainSearchPage>
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(
           builder: (_) => LoginPage(
-            initialErrorMessage:
-                'Sitzung oder Lizenz ist nicht mehr gueltig. Bitte erneut anmelden.',
+            initialErrorMessage: tr(
+              'Sitzung oder Lizenz ist nicht mehr gültig. Bitte erneut anmelden.',
+              'The session or license is no longer valid. Please log in again.',
+            ),
           ),
         ),
         (route) => false,
@@ -1841,15 +2477,21 @@ class _MainSearchPageState extends State<MainSearchPage>
 
       return false;
     } catch (_) {
+      if (await LicenseCheckPrefs.isWithinOfflineGracePeriod()) {
+        return true;
+      }
+
       await AppStorage.clearTokens();
 
       if (!mounted) return false;
 
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(
-          builder: (_) => const LoginPage(
-            initialErrorMessage:
-                'Lizenz konnte nicht geprueft werden. Bitte erneut anmelden.',
+          builder: (_) => LoginPage(
+            initialErrorMessage: tr(
+              'Lizenz konnte nicht geprüft werden. Bitte erneut anmelden.',
+              'The license could not be verified. Please log in again.',
+            ),
           ),
         ),
         (route) => false,
@@ -1865,8 +2507,31 @@ class _MainSearchPageState extends State<MainSearchPage>
     return compute(_parseCatalogItemsInBackground, responseBody);
   }
 
+  Future<void> _loadFrankeLabelMappings() async {
+    try {
+      final json = await rootBundle.loadString(
+        AppConfig.frankeLabelMappingAsset,
+      );
+      final mappings = await compute(
+        _parseFrankeLabelMappingsInBackground,
+        json,
+      );
+
+      if (!mounted) return;
+
+      _frankeLabelMappings = mappings;
+    } catch (e) {
+      debugPrint('FRANKE LABEL MAPPING LOAD FAILED: $e');
+      _frankeLabelMappings = [];
+    }
+  }
+
   void _applyCatalogItems(List<CatalogItem> items) {
     _catalog = items;
+    _catalogManufacturers = items
+        .map((item) => _normalizeCatalogSearchText(item.manufacturer))
+        .where((manufacturer) => manufacturer.isNotEmpty)
+        .toSet();
     _totalCount = items.length;
     _pageLoading = false;
     _countLoading = _dwgDisplayCount == null && _totalCount == null;
@@ -1886,9 +2551,15 @@ class _MainSearchPageState extends State<MainSearchPage>
 
   Future<void> _rebuildCatalogSearchIndex(int runId) async {
     final catalogSnapshot = List<CatalogItem>.of(_catalog);
+    final frankeLabelMappingsSnapshot = List<FrankeLabelMapping>.of(
+      _frankeLabelMappings,
+    );
     final index = await compute(
       _buildCatalogSearchIndexInBackground,
-      catalogSnapshot,
+      _CatalogIndexBuildInput(
+        catalog: catalogSnapshot,
+        frankeLabelMappings: frankeLabelMappingsSnapshot,
+      ),
     );
 
     if (!mounted || runId != _catalogIndexBuildRunId) return;
@@ -1951,7 +2622,10 @@ class _MainSearchPageState extends State<MainSearchPage>
       if (!mounted) return;
       setState(() {
         if (_catalog.isEmpty) {
-          _message = 'Katalog konnte nicht geladen werden.';
+          _message = tr(
+            'Katalog konnte nicht geladen werden.',
+            'Could not load the catalog.',
+          );
         }
         _pageLoading = false;
         _countLoading = false;
@@ -1973,6 +2647,9 @@ class _MainSearchPageState extends State<MainSearchPage>
         _results = [];
         _searchLoading = false;
         _activeHighlightTerm = '';
+        _showSinkLabelMatchWarning = false;
+        _recognizedSinkLabelNumber = '';
+        _resultChromeCollapsed = false;
         _message = '';
       });
       return;
@@ -1980,6 +2657,24 @@ class _MainSearchPageState extends State<MainSearchPage>
 
     _debounce = Timer(const Duration(milliseconds: 450), () {
       _handleSearchDirect(q);
+    });
+  }
+
+  void _onSearchFocusChanged() {
+    if (!mounted) return;
+
+    if (_searchFocusNode.hasFocus) {
+      if (!_resultChromeCollapsed) return;
+      setState(() {
+        _resultChromeCollapsed = false;
+      });
+      return;
+    }
+
+    if (_results.isEmpty || _searchLoading || _resultChromeCollapsed) return;
+
+    setState(() {
+      _resultChromeCollapsed = true;
     });
   }
 
@@ -2125,6 +2820,118 @@ class _MainSearchPageState extends State<MainSearchPage>
     return keys.where((e) => e.length >= minSearchLen).toSet();
   }
 
+  Set<String> _buildExactArticleNumberKeys(String input) {
+    final keys = <String>{};
+
+    for (final variant in _buildCompareVariants(input)) {
+      final normalized = _normalizeForSearch(variant);
+      final compact = normalized.replaceAll(RegExp(r'[^a-z0-9]'), '');
+
+      if (normalized.length >= manualSearchLen) keys.add(normalized);
+      if (compact.length >= manualSearchLen) keys.add(compact);
+    }
+
+    return keys;
+  }
+
+  bool _hasFrankeSinkLabelNumber(String rawText, List<OcrBoxCandidate> boxes) {
+    return extractFrankeSinkLabelNumbers(
+      [rawText, ...boxes.map((e) => e.text)].join(' '),
+    ).isNotEmpty;
+  }
+
+  bool _hasBlancoSinkLabelNumber(String rawText, List<OcrBoxCandidate> boxes) {
+    return extractBlancoSinkLabelNumbers(
+      [rawText, ...boxes.map((e) => e.text)].join(' '),
+    ).isNotEmpty;
+  }
+
+  bool _hasBoraModelNumber(String rawText, List<OcrBoxCandidate> boxes) {
+    return extractBoraModelNumbers(
+      [rawText, ...boxes.map((e) => e.text)].join(' '),
+    ).isNotEmpty;
+  }
+
+  bool _isFrankeLabelSearchTerm(String term) {
+    if (_frankeLabelMappings.isEmpty) return false;
+
+    final termKeys = _buildExactArticleNumberKeys(term);
+    if (termKeys.isEmpty) return false;
+
+    for (final mapping in _frankeLabelMappings) {
+      final labelKeys = _buildExactArticleNumberKeys(mapping.label);
+      if (labelKeys.any(termKeys.contains)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  bool _isBlancoLabelSearchTerm(String term) {
+    return extractBlancoSinkLabelNumbers(term).isNotEmpty;
+  }
+
+  bool _isBoraLabelSearchTerm(String term) {
+    return extractBoraModelNumbers('Model: $term').isNotEmpty;
+  }
+
+  bool _isSinkLabelSearchTerm(String term) {
+    return _isFrankeLabelSearchTerm(term) ||
+        _isBlancoLabelSearchTerm(term) ||
+        _isBoraLabelSearchTerm(term);
+  }
+
+  String _recognizedSinkLabelNumberForSearchTerm(String term) {
+    return recognizedSinkLabelNumber(term) ?? term.trim();
+  }
+
+  String _labelRuleNameForSearchTerm(String term) {
+    if (extractFrankeSinkLabelNumbers(term).isNotEmpty) return 'franke';
+    if (extractBlancoSinkLabelNumbers(term).isNotEmpty) return 'blanco';
+    if (extractBoraModelNumbers('Model: $term').isNotEmpty) return 'bora';
+    return '';
+  }
+
+  void _logSearchQuality({
+    required String event,
+    required String searchType,
+    required String term,
+    String usedTerm = '',
+    String labelRule = '',
+    String recognizedLabel = '',
+    int? resultCount,
+    List<CatalogItem> results = const [],
+    List<String> ocrTerms = const [],
+  }) {
+    final topResults = results.take(maxOcrResultCount).toList();
+
+    unawaited(
+      http
+          .post(
+            Uri.parse(AppConfig.logUrl),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'event': event,
+              'search_type': searchType,
+              'term': term,
+              'used_term': usedTerm.isEmpty ? term : usedTerm,
+              'label_rule': labelRule,
+              'recognized_label': recognizedLabel,
+              'found': (resultCount ?? results.length) > 0 ? 1 : 0,
+              'result_count': resultCount ?? results.length,
+              'result_ids': topResults.map((item) => item.id).join('|'),
+              'result_names': topResults.map((item) => item.basename).join('|'),
+              'ocr_terms': ocrTerms.take(12).join('|'),
+            }),
+          )
+          .catchError((_) {
+            // Qualitaetslogging darf die Suche nie beeinflussen.
+            return http.Response('', 0);
+          }),
+    );
+  }
+
   List<CatalogItem> _localSearch(String q) {
     final queryVariants = _buildCompareVariants(q);
     if (queryVariants.isEmpty) return [];
@@ -2225,12 +3032,12 @@ class _MainSearchPageState extends State<MainSearchPage>
           children: [
             ListTile(
               leading: const Icon(Icons.photo_camera_outlined),
-              title: const Text('Kamera'),
+              title: Text(tr('Kamera', 'Camera')),
               onTap: () => Navigator.of(context).pop(ImageSource.camera),
             ),
             ListTile(
               leading: const Icon(Icons.photo_library_outlined),
-              title: const Text('Galerie'),
+              title: Text(tr('Galerie', 'Gallery')),
               onTap: () => Navigator.of(context).pop(ImageSource.gallery),
             ),
           ],
@@ -2397,16 +3204,9 @@ class _MainSearchPageState extends State<MainSearchPage>
       return true;
     }
 
-    // Zusätzlich gegen Hersteller aus dem Catalog prüfen.
-    for (final item in _catalog) {
-      final manufacturer = _normalizeForSearch(item.manufacturer);
-
-      if (manufacturer.isNotEmpty && manufacturer == normalized) {
-        return true;
-      }
-    }
-
-    return false;
+    // Zusätzlich gegen Hersteller aus dem Katalog prüfen. Das vorbereitete Set
+    // hält die OCR-Kandidatenbildung auch bei großen Katalogen reaktionsschnell.
+    return _catalogManufacturers.contains(normalized);
   }
 
   bool _isManufacturerOcrToken(String token) {
@@ -2876,73 +3676,37 @@ class _MainSearchPageState extends State<MainSearchPage>
     String originalPath,
   ) async {
     const maxOcrImageSide = 1800;
+    final result = await compute(_prepareOcrInputImageInBackground, {
+      'path': originalPath,
+      'maxSide': maxOcrImageSide,
+    });
+    final error = result['error'];
+    if (error != null) debugPrint('OCR RESIZE FAILED: $error');
 
-    try {
-      final bytes = await File(originalPath).readAsBytes();
-      final decoded = img.decodeImage(bytes);
-
-      if (decoded == null) {
-        return (path: originalPath, isTemporary: false);
-      }
-
-      final longestSide = decoded.width > decoded.height
-          ? decoded.width
-          : decoded.height;
-
-      if (longestSide <= maxOcrImageSide) {
-        return (path: originalPath, isTemporary: false);
-      }
-
-      final scale = maxOcrImageSide / longestSide;
-      final resized = img.copyResize(
-        decoded,
-        width: (decoded.width * scale).round(),
-        height: (decoded.height * scale).round(),
-        interpolation: img.Interpolation.linear,
-      );
-
-      final resizedPath =
-          '${Directory.systemTemp.path}/atool_ocr_resized_${DateTime.now().millisecondsSinceEpoch}.jpg';
-
-      await File(resizedPath).writeAsBytes(img.encodeJpg(resized, quality: 88));
-
-      return (path: resizedPath, isTemporary: true);
-    } catch (e) {
-      debugPrint('OCR RESIZE FAILED: $e');
-      return (path: originalPath, isTemporary: false);
-    }
+    return (
+      path: result['path']! as String,
+      isTemporary: result['isTemporary']! as bool,
+    );
   }
 
   Future<List<({String path, int rotation})>> _buildFallbackOcrImageVariants(
     String originalPath,
   ) async {
-    // Etiketten stehen manchmal auf dem Kopf oder seitlich.
-    final variants = <({String path, int rotation})>[];
+    // Etiketten stehen manchmal auf dem Kopf oder seitlich. Die aufwendige
+    // Bildverarbeitung darf den Abbrechen-Button nicht blockieren.
+    final variants = await compute(
+      _buildFallbackOcrImageVariantsInBackground,
+      originalPath,
+    );
 
-    try {
-      final bytes = await File(originalPath).readAsBytes();
-      final decoded = img.decodeImage(bytes);
-
-      if (decoded == null) {
-        return variants;
-      }
-
-      for (final rotation in [180, 90, 270]) {
-        final rotated = img.copyRotate(decoded, angle: rotation);
-        final rotatedPath =
-            '${Directory.systemTemp.path}/atool_ocr_rotated_${rotation}_${DateTime.now().millisecondsSinceEpoch}.jpg';
-
-        await File(
-          rotatedPath,
-        ).writeAsBytes(img.encodeJpg(rotated, quality: 88));
-
-        variants.add((path: rotatedPath, rotation: rotation));
-      }
-    } catch (e) {
-      debugPrint('OCR ROTATION FAILED: $e');
-    }
-
-    return variants;
+    return variants
+        .map(
+          (variant) => (
+            path: variant['path']! as String,
+            rotation: variant['rotation']! as int,
+          ),
+        )
+        .toList();
   }
 
   List<String> _buildDomainOcrCandidates(
@@ -3292,10 +4056,11 @@ class _MainSearchPageState extends State<MainSearchPage>
     return bestScore;
   }
 
-  List<OcrCatalogMatch> _findFormattedArticleNumberOcrMatches(
+  Future<List<OcrCatalogMatch>> _findFormattedArticleNumberOcrMatches(
     String rawText,
     List<OcrBoxCandidate> boxes,
-  ) {
+    int ocrRunId,
+  ) async {
     final formattedCandidates = <String>[];
     final formattedRegex = RegExp(r'\d{2,5}[.\-\/]\d{2,6}([.\-\/]\d{2,6})+');
 
@@ -3333,6 +4098,9 @@ class _MainSearchPageState extends State<MainSearchPage>
     final seen = <String>{};
 
     for (final candidate in formattedCandidates.take(6)) {
+      await Future<void>.delayed(Duration.zero);
+      if (_isOcrRunCancelled(ocrRunId)) return [];
+
       final found = _fastLocalOcrSearch(candidate, limit: maxOcrResultCount);
 
       for (final item in found) {
@@ -3366,10 +4134,197 @@ class _MainSearchPageState extends State<MainSearchPage>
     return results;
   }
 
-  List<OcrCatalogMatch> _findFastNumberOcrMatches(
+  Future<List<OcrCatalogMatch>> _findFrankeSinkLabelNumberOcrMatches(
     String rawText,
     List<OcrBoxCandidate> boxes,
-  ) {
+    int ocrRunId,
+  ) async {
+    final candidates = <String>[];
+
+    void addCandidates(String value) {
+      for (final label in extractFrankeSinkLabelNumbers(value)) {
+        if (!candidates.contains(label)) candidates.add(label);
+      }
+    }
+
+    for (final box in boxes) {
+      addCandidates(box.text);
+    }
+    addCandidates(rawText);
+
+    if (candidates.isEmpty) return [];
+
+    debugPrint('FRANKE SINK LABEL OCR CANDIDATES: $candidates');
+
+    final results = <OcrCatalogMatch>[];
+    final seen = <String>{};
+
+    for (final candidate in candidates.take(6)) {
+      await Future<void>.delayed(Duration.zero);
+      if (_isOcrRunCancelled(ocrRunId)) return [];
+
+      final found = _fastLocalOcrSearch(candidate, limit: maxOcrResultCount);
+
+      for (final item in found) {
+        final key = '${item.id}|${item.basename}';
+        if (!seen.add(key)) continue;
+
+        results.add(
+          OcrCatalogMatch(
+            item: item,
+            usedTerm: candidate,
+            originalTerm: candidate,
+            score: 14000,
+          ),
+        );
+
+        if (results.length >= maxOcrResultCount) {
+          debugPrint(
+            'FRANKE SINK LABEL OCR MATCHES: ${results.map((e) => '${e.item.basename} | ${e.usedTerm}').toList()}',
+          );
+          return results;
+        }
+      }
+    }
+
+    if (results.isNotEmpty) {
+      debugPrint(
+        'FRANKE SINK LABEL OCR MATCHES: ${results.map((e) => '${e.item.basename} | ${e.usedTerm}').toList()}',
+      );
+    }
+
+    return results;
+  }
+
+  Future<List<OcrCatalogMatch>> _findBlancoSinkLabelNumberOcrMatches(
+    String rawText,
+    List<OcrBoxCandidate> boxes,
+    int ocrRunId,
+  ) async {
+    final candidates = rankBlancoSinkLabelNumbers(
+      rawText: rawText,
+      boxes: boxes
+          .map(
+            (box) => OcrLabelBoxText(
+              text: box.text,
+              area: box.area,
+              height: box.height,
+            ),
+          )
+          .toList(),
+    );
+
+    if (candidates.isEmpty) return [];
+
+    debugPrint('BLANCO SINK LABEL OCR CANDIDATES: $candidates');
+
+    final results = <OcrCatalogMatch>[];
+    final seen = <String>{};
+
+    for (final candidate in candidates.take(6)) {
+      await Future<void>.delayed(Duration.zero);
+      if (_isOcrRunCancelled(ocrRunId)) return [];
+
+      final found = _fastLocalOcrSearch(candidate, limit: maxOcrResultCount);
+
+      for (final item in found) {
+        final key = '${item.id}|${item.basename}';
+        if (!seen.add(key)) continue;
+
+        results.add(
+          OcrCatalogMatch(
+            item: item,
+            usedTerm: candidate,
+            originalTerm: candidate,
+            score: 13500,
+          ),
+        );
+
+        if (results.length >= maxOcrResultCount) {
+          debugPrint(
+            'BLANCO SINK LABEL OCR MATCHES: ${results.map((e) => '${e.item.basename} | ${e.usedTerm}').toList()}',
+          );
+          return results;
+        }
+      }
+    }
+
+    if (results.isNotEmpty) {
+      debugPrint(
+        'BLANCO SINK LABEL OCR MATCHES: ${results.map((e) => '${e.item.basename} | ${e.usedTerm}').toList()}',
+      );
+    }
+
+    return results;
+  }
+
+  Future<List<OcrCatalogMatch>> _findBoraModelNumberOcrMatches(
+    String rawText,
+    List<OcrBoxCandidate> boxes,
+    int ocrRunId,
+  ) async {
+    final candidates = rankBoraModelNumbers(
+      rawText: rawText,
+      boxes: boxes
+          .map(
+            (box) => OcrLabelBoxText(
+              text: box.text,
+              area: box.area,
+              height: box.height,
+            ),
+          )
+          .toList(),
+    );
+
+    if (candidates.isEmpty) return [];
+
+    debugPrint('BORA MODEL OCR CANDIDATES: $candidates');
+
+    final results = <OcrCatalogMatch>[];
+    final seen = <String>{};
+
+    for (final candidate in candidates.take(6)) {
+      await Future<void>.delayed(Duration.zero);
+      if (_isOcrRunCancelled(ocrRunId)) return [];
+
+      final found = _fastLocalOcrSearch(candidate, limit: maxOcrResultCount);
+
+      for (final item in found) {
+        final key = '${item.id}|${item.basename}';
+        if (!seen.add(key)) continue;
+
+        results.add(
+          OcrCatalogMatch(
+            item: item,
+            usedTerm: candidate,
+            originalTerm: candidate,
+            score: 13200,
+          ),
+        );
+
+        if (results.length >= maxOcrResultCount) {
+          debugPrint(
+            'BORA MODEL OCR MATCHES: ${results.map((e) => '${e.item.basename} | ${e.usedTerm}').toList()}',
+          );
+          return results;
+        }
+      }
+    }
+
+    if (results.isNotEmpty) {
+      debugPrint(
+        'BORA MODEL OCR MATCHES: ${results.map((e) => '${e.item.basename} | ${e.usedTerm}').toList()}',
+      );
+    }
+
+    return results;
+  }
+
+  Future<List<OcrCatalogMatch>> _findFastNumberOcrMatches(
+    String rawText,
+    List<OcrBoxCandidate> boxes,
+    int ocrRunId,
+  ) async {
     final numberCandidates = <String>[];
 
     void addNumber(String value) {
@@ -3487,6 +4442,9 @@ class _MainSearchPageState extends State<MainSearchPage>
     final searchLimit = _isIosOcrMode ? 5 : 3;
 
     for (final number in numberCandidates.take(numberLimit)) {
+      await Future<void>.delayed(Duration.zero);
+      if (_isOcrRunCancelled(ocrRunId)) return [];
+
       final found = _fastLocalOcrSearch(number, limit: searchLimit);
 
       for (final item in found) {
@@ -3561,11 +4519,12 @@ class _MainSearchPageState extends State<MainSearchPage>
     return 9;
   }
 
-  List<OcrCatalogMatch> _findBestSmartOcrCatalogMatches(
+  Future<List<OcrCatalogMatch>> _findBestSmartOcrCatalogMatches(
     String rawText,
     List<OcrBoxCandidate> boxes, {
+    required int ocrRunId,
     List<String>? prebuiltCandidates,
-  }) {
+  }) async {
     final candidates =
         prebuiltCandidates ?? _buildSmartOcrCandidates(rawText, boxes);
 
@@ -3577,6 +4536,9 @@ class _MainSearchPageState extends State<MainSearchPage>
     final candidateLimit = _isIosOcrMode ? 20 : 16;
 
     for (final candidate in candidates.take(candidateLimit)) {
+      await Future<void>.delayed(Duration.zero);
+      if (_isOcrRunCancelled(ocrRunId)) return [];
+
       final prefilterLimit = _isIosOcrMode ? 15 : 8;
       final prefilteredItems = _fastLocalOcrSearch(
         candidate,
@@ -3687,23 +4649,82 @@ class _MainSearchPageState extends State<MainSearchPage>
     return stages;
   }
 
+  bool _isOcrRunCancelled(int ocrRunId) {
+    return _ocrCancelRequested || ocrRunId != _ocrRunId;
+  }
+
+  Future<void> _deleteOcrTempFiles(Iterable<String> paths) async {
+    for (final path in paths) {
+      try {
+        final file = File(path);
+        if (await file.exists()) await file.delete();
+      } catch (_) {
+        // Temporäre OCR-Dateien sind nur ein Cache und dürfen den Ablauf nicht
+        // beeinflussen.
+      }
+    }
+  }
+
   Future<List<OcrCatalogMatch>> _findStructuredOcrCatalogMatches(
     String rawText,
     List<OcrBoxCandidate> sortedBoxes,
+    int ocrRunId,
   ) {
-    return _findStructuredOcrCatalogMatchesAsync(rawText, sortedBoxes);
+    return _findStructuredOcrCatalogMatchesAsync(
+      rawText,
+      sortedBoxes,
+      ocrRunId,
+    );
   }
 
   Future<List<OcrCatalogMatch>> _findStructuredOcrCatalogMatchesAsync(
     String rawText,
     List<OcrBoxCandidate> sortedBoxes,
+    int ocrRunId,
   ) async {
     final stages = _buildOcrBoxSearchStages(sortedBoxes);
     final searchedSmartSignatures = <String>{};
 
-    final formattedArticleMatches = _findFormattedArticleNumberOcrMatches(
+    final blancoSinkLabelMatches = await _findBlancoSinkLabelNumberOcrMatches(
       rawText,
       sortedBoxes,
+      ocrRunId,
+    );
+    if (blancoSinkLabelMatches.isNotEmpty) {
+      return _limitUniqueOcrMatches(blancoSinkLabelMatches);
+    }
+    if (_hasBlancoSinkLabelNumber(rawText, sortedBoxes)) {
+      return [];
+    }
+
+    final frankeSinkLabelMatches = await _findFrankeSinkLabelNumberOcrMatches(
+      rawText,
+      sortedBoxes,
+      ocrRunId,
+    );
+    if (frankeSinkLabelMatches.isNotEmpty) {
+      return _limitUniqueOcrMatches(frankeSinkLabelMatches);
+    }
+    if (_hasFrankeSinkLabelNumber(rawText, sortedBoxes)) {
+      return [];
+    }
+
+    final boraModelMatches = await _findBoraModelNumberOcrMatches(
+      rawText,
+      sortedBoxes,
+      ocrRunId,
+    );
+    if (boraModelMatches.isNotEmpty) {
+      return _limitUniqueOcrMatches(boraModelMatches);
+    }
+    if (_hasBoraModelNumber(rawText, sortedBoxes)) {
+      return [];
+    }
+
+    final formattedArticleMatches = await _findFormattedArticleNumberOcrMatches(
+      rawText,
+      sortedBoxes,
+      ocrRunId,
     );
     if (formattedArticleMatches.isNotEmpty) {
       return _limitUniqueOcrMatches(formattedArticleMatches);
@@ -3711,7 +4732,7 @@ class _MainSearchPageState extends State<MainSearchPage>
 
     for (int i = 0; i < stages.length; i++) {
       await Future<void>.delayed(Duration.zero);
-      if (_ocrCancelRequested) return [];
+      if (_isOcrRunCancelled(ocrRunId)) return [];
 
       final stage = stages[i];
       debugPrint(
@@ -3722,9 +4743,10 @@ class _MainSearchPageState extends State<MainSearchPage>
       final smartSignature = smartCandidates.take(16).join('|');
       if (smartSignature.isNotEmpty &&
           searchedSmartSignatures.add(smartSignature)) {
-        final smartMatches = _findBestSmartOcrCatalogMatches(
+        final smartMatches = await _findBestSmartOcrCatalogMatches(
           '',
           stage,
+          ocrRunId: ocrRunId,
           prebuiltCandidates: smartCandidates,
         );
         if (smartMatches.isNotEmpty) {
@@ -3733,28 +4755,33 @@ class _MainSearchPageState extends State<MainSearchPage>
       }
 
       await Future<void>.delayed(Duration.zero);
-      if (_ocrCancelRequested) return [];
+      if (_isOcrRunCancelled(ocrRunId)) return [];
 
-      final fastMatches = _findFastNumberOcrMatches('', stage);
+      final fastMatches = await _findFastNumberOcrMatches('', stage, ocrRunId);
       if (fastMatches.isNotEmpty) {
         return _limitUniqueOcrMatches(fastMatches);
       }
     }
 
     await Future<void>.delayed(Duration.zero);
-    if (_ocrCancelRequested) return [];
+    if (_isOcrRunCancelled(ocrRunId)) return [];
 
     final fullSmartCandidates = _buildSmartOcrCandidates(rawText, sortedBoxes);
     final fullSmartSignature = fullSmartCandidates.take(16).join('|');
     if (fullSmartSignature.isNotEmpty &&
         !searchedSmartSignatures.add(fullSmartSignature)) {
-      final fullFastMatches = _findFastNumberOcrMatches(rawText, sortedBoxes);
+      final fullFastMatches = await _findFastNumberOcrMatches(
+        rawText,
+        sortedBoxes,
+        ocrRunId,
+      );
       return _limitUniqueOcrMatches(fullFastMatches);
     }
 
-    final fullSmartMatches = _findBestSmartOcrCatalogMatches(
+    final fullSmartMatches = await _findBestSmartOcrCatalogMatches(
       rawText,
       sortedBoxes,
+      ocrRunId: ocrRunId,
       prebuiltCandidates: fullSmartCandidates,
     );
 
@@ -3763,13 +4790,19 @@ class _MainSearchPageState extends State<MainSearchPage>
     }
 
     await Future<void>.delayed(Duration.zero);
-    if (_ocrCancelRequested) return [];
+    if (_isOcrRunCancelled(ocrRunId)) return [];
 
-    final fullFastMatches = _findFastNumberOcrMatches(rawText, sortedBoxes);
+    final fullFastMatches = await _findFastNumberOcrMatches(
+      rawText,
+      sortedBoxes,
+      ocrRunId,
+    );
     return _limitUniqueOcrMatches(fullFastMatches);
   }
 
   Future<void> _runLocalOcr(ImageSource source) async {
+    int? startedOcrRunId;
+
     try {
       final picker = ImagePicker();
       final XFile? picked = await picker.pickImage(
@@ -3783,6 +4816,7 @@ class _MainSearchPageState extends State<MainSearchPage>
       if (!mounted) return;
 
       final currentOcrRunId = ++_ocrRunId;
+      startedOcrRunId = currentOcrRunId;
 
       setState(() {
         _searchLoading = true;
@@ -3791,6 +4825,9 @@ class _MainSearchPageState extends State<MainSearchPage>
         _results = [];
         _showOcrSuggestions = false;
         _activeHighlightTerm = '';
+        _showSinkLabelMatchWarning = false;
+        _recognizedSinkLabelNumber = '';
+        _resultChromeCollapsed = false;
         _ocrSearchActive = true;
         _ocrCancelRequested = false;
       });
@@ -3804,6 +4841,10 @@ class _MainSearchPageState extends State<MainSearchPage>
       final tempOcrPaths = <String>{
         if (preparedImage.isTemporary) preparedImage.path,
       };
+      if (_isOcrRunCancelled(currentOcrRunId)) {
+        await _deleteOcrTempFiles(tempOcrPaths);
+        return;
+      }
       final imageVariants = <({String path, int rotation})>[
         (path: preparedImage.path, rotation: 0),
       ];
@@ -3846,8 +4887,10 @@ class _MainSearchPageState extends State<MainSearchPage>
           setState(() {
             _ocrBoxTexts = visibleBoxTexts;
             _showOcrSuggestions = true;
-            _message =
-                'OCR liest den Aufkleber. Du kannst unten schon einen Begriff antippen oder abbrechen.';
+            _message = tr(
+              'OCR liest den Aufkleber. Du kannst unten schon einen Begriff antippen oder abbrechen.',
+              'OCR is reading the label. You can already select a term below or cancel.',
+            );
           });
         }
 
@@ -3869,6 +4912,7 @@ class _MainSearchPageState extends State<MainSearchPage>
         final structuredMatches = await _findStructuredOcrCatalogMatches(
           rawText,
           sortedBoxes,
+          currentOcrRunId,
         );
 
         if (_ocrCancelRequested || currentOcrRunId != _ocrRunId) {
@@ -3926,22 +4970,16 @@ class _MainSearchPageState extends State<MainSearchPage>
             preparedImage.path,
           );
           tempOcrPaths.addAll(fallbackVariants.map((e) => e.path));
+          if (_isOcrRunCancelled(currentOcrRunId)) {
+            break;
+          }
           imageVariants.addAll(fallbackVariants);
           fallbackRotationsLoaded = true;
         }
       }
 
       // Temporaere OCR-Zwischenbilder loeschen.
-      for (final path in tempOcrPaths) {
-        try {
-          final file = File(path);
-          if (await file.exists()) {
-            await file.delete();
-          }
-        } catch (_) {
-          // Nicht kritisch.
-        }
-      }
+      await _deleteOcrTempFiles(tempOcrPaths);
 
       if (!mounted) return;
 
@@ -3954,9 +4992,14 @@ class _MainSearchPageState extends State<MainSearchPage>
           _searchLoading = false;
           _ocrSearchActive = false;
           _results = [];
+          _showSinkLabelMatchWarning = false;
+          _recognizedSinkLabelNumber = '';
+          _resultChromeCollapsed = false;
           _showOcrSuggestions = _ocrBoxTexts.isNotEmpty;
-          _message =
-              'OCR-Suche abgebrochen. Wähle einen erkannten Begriff aus der Liste.';
+          _message = tr(
+            'OCR-Suche abgebrochen. Wähle einen erkannten Begriff aus der Liste.',
+            'OCR search canceled. Select a recognized term from the list.',
+          );
         });
         return;
       }
@@ -3966,15 +5009,40 @@ class _MainSearchPageState extends State<MainSearchPage>
       debugPrint('SMART OCR FINAL SCORE: $bestSmartOcrScore');
 
       if (bestMatches.isEmpty) {
+        final recognizedLabel =
+            recognizedSinkLabelNumber(
+              [bestRawText, ...bestVisibleBoxTexts].join(' '),
+            ) ??
+            '';
+        _logSearchQuality(
+          event: 'search',
+          searchType: 'ocr',
+          term: recognizedLabel.isNotEmpty ? recognizedLabel : bestRawText,
+          usedTerm: recognizedLabel,
+          labelRule: _labelRuleNameForSearchTerm(recognizedLabel),
+          recognizedLabel: recognizedLabel,
+          resultCount: 0,
+          ocrTerms: bestVisibleBoxTexts,
+        );
+
         setState(() {
           _searchLoading = false;
           _ocrSearchActive = false;
           _results = [];
+          _showSinkLabelMatchWarning = false;
+          _recognizedSinkLabelNumber = '';
+          _resultChromeCollapsed = false;
           _ocrBoxTexts = bestVisibleBoxTexts;
           _showOcrSuggestions = true;
           _message = _isIosOcrMode
-              ? 'Keine hinterlegten Artikel im Aufkleber gefunden. Tipp: Etikett gerade und möglichst bildfüllend fotografieren.'
-              : 'Keine hinterlegten Artikel im Aufkleber gefunden.';
+              ? tr(
+                  'Keine hinterlegten Artikel im Aufkleber gefunden. Tipp: Etikett gerade und möglichst bildfüllend fotografieren.',
+                  'No stored items were found on the label. Tip: Photograph the label straight and as full-frame as possible.',
+                )
+              : tr(
+                  'Keine hinterlegten Artikel im Aufkleber gefunden.',
+                  'No stored items were found on the label.',
+                );
         });
         return;
       }
@@ -3983,17 +5051,27 @@ class _MainSearchPageState extends State<MainSearchPage>
         _searchLoading = false;
         _ocrSearchActive = false;
         _results = bestMatches;
+        _resultChromeCollapsed = true;
         _ocrBoxTexts = bestVisibleBoxTexts;
         _showOcrSuggestions = bestVisibleBoxTexts.isNotEmpty;
         _activeHighlightTerm = bestUsedSearchText;
+        _showSinkLabelMatchWarning =
+            bestMatches.isNotEmpty &&
+            _isSinkLabelSearchTerm(bestUsedSearchText);
+        _recognizedSinkLabelNumber = _showSinkLabelMatchWarning
+            ? _recognizedSinkLabelNumberForSearchTerm(bestUsedSearchText)
+            : '';
 
         if (bestUsedSearchText.isNotEmpty) {
           final rotationInfo = _isIosOcrMode && bestRotation != 0
-              ? ' Bilddrehung: $bestRotation°.'
+              ? isEnglish
+                    ? ' Image rotation: $bestRotation°.'
+                    : ' Bilddrehung: $bestRotation°.'
               : '';
 
-          _message =
-              'ATool-Treffer über intelligente Suche: $bestUsedSearchText – beste ${bestMatches.length} Treffer angezeigt.$rotationInfo';
+          _message = isEnglish
+              ? 'ATool match from smart search: $bestUsedSearchText – showing the best ${bestMatches.length} results.$rotationInfo'
+              : 'ATool-Treffer über intelligente Suche: $bestUsedSearchText – beste ${bestMatches.length} Treffer angezeigt.$rotationInfo';
         } else {
           _message = '';
         }
@@ -4003,10 +5081,27 @@ class _MainSearchPageState extends State<MainSearchPage>
         _setSearchTextSilently(bestUsedSearchText);
       }
 
+      final labelRule = _labelRuleNameForSearchTerm(bestUsedSearchText);
+      _logSearchQuality(
+        event: 'search',
+        searchType: 'ocr',
+        term: bestUsedSearchText,
+        usedTerm: bestUsedSearchText,
+        labelRule: labelRule,
+        recognizedLabel: labelRule.isNotEmpty
+            ? _recognizedSinkLabelNumberForSearchTerm(bestUsedSearchText)
+            : '',
+        resultCount: bestMatches.length,
+        results: bestMatches,
+        ocrTerms: bestVisibleBoxTexts,
+      );
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            '${bestMatches.length} Artikel aus dem Aufkleber gefunden.',
+            isEnglish
+                ? '${bestMatches.length} items found on the label.'
+                : '${bestMatches.length} Artikel aus dem Aufkleber gefunden.',
           ),
         ),
       );
@@ -4015,11 +5110,15 @@ class _MainSearchPageState extends State<MainSearchPage>
       debugPrint('$stackTrace');
 
       if (!mounted) return;
+      if (startedOcrRunId != null && startedOcrRunId != _ocrRunId) return;
 
       setState(() {
         _searchLoading = false;
         _ocrSearchActive = false;
-        _message = 'Kamera/OCR fehlgeschlagen.';
+        _showSinkLabelMatchWarning = false;
+        _recognizedSinkLabelNumber = '';
+        _resultChromeCollapsed = false;
+        _message = tr('Kamera/OCR fehlgeschlagen.', 'Camera/OCR failed.');
       });
     }
   }
@@ -4070,7 +5169,13 @@ class _MainSearchPageState extends State<MainSearchPage>
         _results = [];
         _searchLoading = false;
         _activeHighlightTerm = q;
-        _message = 'Katalog wird noch geladen. Bitte kurz erneut suchen.';
+        _showSinkLabelMatchWarning = false;
+        _recognizedSinkLabelNumber = '';
+        _resultChromeCollapsed = false;
+        _message = tr(
+          'Katalog wird noch geladen. Bitte kurz erneut suchen.',
+          'The catalog is still loading. Please try again shortly.',
+        );
       });
       return;
     }
@@ -4080,7 +5185,13 @@ class _MainSearchPageState extends State<MainSearchPage>
         _results = [];
         _searchLoading = false;
         _activeHighlightTerm = q;
-        _message = 'Katalog wird vorbereitet. Bitte kurz erneut suchen.';
+        _showSinkLabelMatchWarning = false;
+        _recognizedSinkLabelNumber = '';
+        _resultChromeCollapsed = false;
+        _message = tr(
+          'Katalog wird vorbereitet. Bitte kurz erneut suchen.',
+          'The catalog is being prepared. Please try again shortly.',
+        );
       });
       _scheduleCatalogSearchIndexRebuild();
       return;
@@ -4090,6 +5201,9 @@ class _MainSearchPageState extends State<MainSearchPage>
       _ocrRunId++;
       _searchLoading = false;
       _message = '';
+      _showSinkLabelMatchWarning = false;
+      _recognizedSinkLabelNumber = '';
+      _resultChromeCollapsed = false;
       if (!preserveOcrSuggestions) {
         _showOcrSuggestions = false;
         _ocrBoxTexts = [];
@@ -4124,41 +5238,54 @@ class _MainSearchPageState extends State<MainSearchPage>
       setState(() {
         _results = found;
         _searchLoading = false;
+        _resultChromeCollapsed = found.isNotEmpty && !_searchFocusNode.hasFocus;
         _activeHighlightTerm = usedSearchTerm;
+        _showSinkLabelMatchWarning =
+            found.isNotEmpty && _isSinkLabelSearchTerm(usedSearchTerm);
+        _recognizedSinkLabelNumber = _showSinkLabelMatchWarning
+            ? _recognizedSinkLabelNumberForSearchTerm(usedSearchTerm)
+            : '';
 
         if (found.isNotEmpty && usedSearchTerm != q) {
-          _message =
-              'Kein exakter Treffer für "$q". Treffer für "$usedSearchTerm" angezeigt.';
+          _message = isEnglish
+              ? 'No exact match for “$q”. Showing results for “$usedSearchTerm”.'
+              : 'Kein exakter Treffer für "$q". Treffer für "$usedSearchTerm" angezeigt.';
         } else {
           _message = '';
         }
       });
 
-      unawaited(
-        http.post(
-          Uri.parse(AppConfig.logUrl),
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({
-            'term': q,
-            'used_term': usedSearchTerm,
-            'found': found.isNotEmpty ? 1 : 0,
-          }),
-        ),
+      _logSearchQuality(
+        event: 'search',
+        searchType: 'manual',
+        term: q,
+        usedTerm: usedSearchTerm,
+        labelRule: _labelRuleNameForSearchTerm(usedSearchTerm),
+        recognizedLabel:
+            found.isNotEmpty && _isSinkLabelSearchTerm(usedSearchTerm)
+            ? _recognizedSinkLabelNumberForSearchTerm(usedSearchTerm)
+            : '',
+        resultCount: found.length,
+        results: found,
       );
     } catch (_) {
       if (!mounted) return;
       if (runId != _manualSearchRunId) return;
       setState(() {
         _searchLoading = false;
-        _message = 'Suche fehlgeschlagen.';
+        _showSinkLabelMatchWarning = false;
+        _recognizedSinkLabelNumber = '';
+        _resultChromeCollapsed = false;
+        _message = tr('Suche fehlgeschlagen.', 'Search failed.');
       });
     }
   }
 
-  void _showInfoDialog() {
-    Navigator.of(
+  Future<void> _showInfoDialog() async {
+    await Navigator.of(
       context,
     ).push(MaterialPageRoute(builder: (_) => const InfoLicensePage()));
+    if (mounted) setState(() {});
   }
 
   void _cancelOcrSearch() {
@@ -4171,8 +5298,24 @@ class _MainSearchPageState extends State<MainSearchPage>
       _searchLoading = false;
       _showOcrSuggestions = _ocrBoxTexts.isNotEmpty;
       _message = _ocrBoxTexts.isNotEmpty
-          ? 'OCR-Suche abgebrochen. Wähle einen erkannten Begriff aus der Liste.'
-          : 'OCR-Suche wird abgebrochen.';
+          ? tr(
+              'OCR-Suche abgebrochen. Wähle einen erkannten Begriff aus der Liste.',
+              'OCR search canceled. Select a recognized term from the list.',
+            )
+          : tr(
+              'OCR-Suche abgebrochen. Gib die Artikelnummer manuell ein.',
+              'OCR search canceled. Enter the item number manually.',
+            );
+    });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _searchFocusNode.canRequestFocus = true;
+      _searchFocusNode.requestFocus();
+      _searchController.selection = TextSelection(
+        baseOffset: 0,
+        extentOffset: _searchController.text.length,
+      );
     });
   }
 
@@ -4200,10 +5343,16 @@ class _MainSearchPageState extends State<MainSearchPage>
 
   Future<void> _openImageViewer(String imageUrl, String filename) async {
     if (!mounted) return;
+    final localImagePath = await OfflineImageStore.existingPathForUrl(imageUrl);
+    if (!mounted) return;
 
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => ImageViewerPage(imageUrl: imageUrl, filename: filename),
+        builder: (_) => ImageViewerPage(
+          imageUrl: imageUrl,
+          filename: filename,
+          localImagePath: localImagePath,
+        ),
       ),
     );
   }
@@ -4222,7 +5371,9 @@ class _MainSearchPageState extends State<MainSearchPage>
 
         return (
           value: uri,
-          label: name.isNotEmpty ? name : 'Ausgewählter Ordner',
+          label: name.isNotEmpty
+              ? name
+              : tr('Ausgewählter Ordner', 'Selected folder'),
         );
       }
 
@@ -4238,12 +5389,14 @@ class _MainSearchPageState extends State<MainSearchPage>
 
         return (
           value: bookmark,
-          label: name.isNotEmpty ? name : 'Ausgewählter Ordner',
+          label: name.isNotEmpty
+              ? name
+              : tr('Ausgewählter Ordner', 'Selected folder'),
         );
       }
 
       final String? dir = await FilePicker.getDirectoryPath(
-        dialogTitle: 'Download-Ordner wählen',
+        dialogTitle: tr('Download-Ordner wählen', 'Select download folder'),
       );
       if (dir == null || dir.isEmpty) return null;
       return (value: dir, label: dir);
@@ -4257,16 +5410,20 @@ class _MainSearchPageState extends State<MainSearchPage>
     final result = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Download-Ziel'),
-        content: Text('Gespeicherten Ordner verwenden?\n\n$dirLabel'),
+        title: Text(tr('Download-Ziel', 'Download destination')),
+        content: Text(
+          isEnglish
+              ? 'Use the saved folder?\n\n$dirLabel'
+              : 'Gespeicherten Ordner verwenden?\n\n$dirLabel',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Neuen Ordner wählen'),
+            child: Text(tr('Neuen Ordner wählen', 'Select new folder')),
           ),
           ElevatedButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Verwenden'),
+            child: Text(tr('Verwenden', 'Use')),
           ),
         ],
       ),
@@ -4302,26 +5459,26 @@ class _MainSearchPageState extends State<MainSearchPage>
                     ),
                   ),
                   const SizedBox(width: 12),
-                  const Expanded(
+                  Expanded(
                     child: Text(
-                      'Download-Ziel',
-                      style: TextStyle(
+                      tr('Download-Ziel', 'Download destination'),
+                      style: const TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
                   ),
                   IconButton(
-                    tooltip: 'Abbrechen',
+                    tooltip: tr('Abbrechen', 'Cancel'),
                     onPressed: () => Navigator.of(dialogContext).pop(null),
                     icon: const Icon(Icons.close),
                   ),
                 ],
               ),
               const SizedBox(height: 14),
-              const Text(
-                'Gespeicherten Ordner verwenden?',
-                style: TextStyle(
+              Text(
+                tr('Gespeicherten Ordner verwenden?', 'Use the saved folder?'),
+                style: const TextStyle(
                   color: Color(0xFF555555),
                   fontSize: 15,
                   height: 1.35,
@@ -4359,8 +5516,11 @@ class _MainSearchPageState extends State<MainSearchPage>
               _downloadActionTile(
                 dialogContext: dialogContext,
                 icon: Icons.check_circle_outline,
-                title: 'Verwenden',
-                subtitle: 'Datei in diesem Ordner speichern',
+                title: tr('Verwenden', 'Use'),
+                subtitle: tr(
+                  'Datei in diesem Ordner speichern',
+                  'Save the file in this folder',
+                ),
                 value: true,
                 primary: true,
               ),
@@ -4368,8 +5528,11 @@ class _MainSearchPageState extends State<MainSearchPage>
               _downloadActionTile(
                 dialogContext: dialogContext,
                 icon: Icons.create_new_folder_outlined,
-                title: 'Neuen Ordner w\u00e4hlen',
-                subtitle: 'Ein anderes Speicherziel ausw\u00e4hlen',
+                title: tr('Neuen Ordner wählen', 'Select new folder'),
+                subtitle: tr(
+                  'Ein anderes Speicherziel auswählen',
+                  'Select a different destination',
+                ),
                 value: false,
               ),
               const SizedBox(height: 8),
@@ -4377,7 +5540,7 @@ class _MainSearchPageState extends State<MainSearchPage>
                 alignment: Alignment.centerRight,
                 child: TextButton(
                   onPressed: () => Navigator.of(dialogContext).pop(null),
-                  child: const Text('Abbrechen'),
+                  child: Text(tr('Abbrechen', 'Cancel')),
                 ),
               ),
             ],
@@ -4510,16 +5673,19 @@ class _MainSearchPageState extends State<MainSearchPage>
                     ),
                   ),
                   IconButton(
-                    tooltip: 'Abbrechen',
+                    tooltip: tr('Abbrechen', 'Cancel'),
                     onPressed: () => Navigator.of(dialogContext).pop(null),
                     icon: const Icon(Icons.close),
                   ),
                 ],
               ),
               const SizedBox(height: 14),
-              const Text(
-                'Was m\u00f6chtest du mit der Datei machen?',
-                style: TextStyle(
+              Text(
+                tr(
+                  'Was möchtest du mit der Datei machen?',
+                  'What would you like to do with the file?',
+                ),
+                style: const TextStyle(
                   color: Color(0xFF555555),
                   fontSize: 15,
                   height: 1.35,
@@ -4529,8 +5695,11 @@ class _MainSearchPageState extends State<MainSearchPage>
               _downloadActionTile(
                 dialogContext: dialogContext,
                 icon: Icons.ios_share_outlined,
-                title: 'Teilen',
-                subtitle: 'An Mail, Drive, OneDrive oder andere Apps senden',
+                title: tr('Teilen', 'Share'),
+                subtitle: tr(
+                  'An Mail, Drive, OneDrive oder andere Apps senden',
+                  'Send to Mail, Drive, OneDrive, or other apps',
+                ),
                 value: true,
                 primary: true,
               ),
@@ -4538,8 +5707,11 @@ class _MainSearchPageState extends State<MainSearchPage>
               _downloadActionTile(
                 dialogContext: dialogContext,
                 icon: Icons.save_alt_outlined,
-                title: 'Auf Ger\u00e4t speichern',
-                subtitle: 'In einem Ordner auf diesem Ger\u00e4t ablegen',
+                title: tr('Auf Gerät speichern', 'Save to device'),
+                subtitle: tr(
+                  'In einem Ordner auf diesem Gerät ablegen',
+                  'Save in a folder on this device',
+                ),
                 value: false,
               ),
               const SizedBox(height: 8),
@@ -4547,7 +5719,7 @@ class _MainSearchPageState extends State<MainSearchPage>
                 alignment: Alignment.centerRight,
                 child: TextButton(
                   onPressed: () => Navigator.of(dialogContext).pop(null),
-                  child: const Text('Abbrechen'),
+                  child: Text(tr('Abbrechen', 'Cancel')),
                 ),
               ),
             ],
@@ -4601,7 +5773,11 @@ class _MainSearchPageState extends State<MainSearchPage>
       if (response.statusCode != 200) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Download fehlgeschlagen (${response.statusCode})'),
+            content: Text(
+              isEnglish
+                  ? 'Download failed (${response.statusCode})'
+                  : 'Download fehlgeschlagen (${response.statusCode})',
+            ),
           ),
         );
         return;
@@ -4684,7 +5860,11 @@ class _MainSearchPageState extends State<MainSearchPage>
 
       if (directoryPath == null || directoryPath.isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Ordnerauswahl abgebrochen.')),
+          SnackBar(
+            content: Text(
+              tr('Ordnerauswahl abgebrochen.', 'Folder selection canceled.'),
+            ),
+          ),
         );
         return;
       }
@@ -4701,14 +5881,25 @@ class _MainSearchPageState extends State<MainSearchPage>
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gespeichert in: $directoryLabel')),
+        SnackBar(
+          content: Text(
+            isEnglish
+                ? 'Saved to: $directoryLabel'
+                : 'Gespeichert in: $directoryLabel',
+          ),
+        ),
       );
     } catch (_) {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Download oder Speichern fehlgeschlagen.'),
+        SnackBar(
+          content: Text(
+            tr(
+              'Download oder Speichern fehlgeschlagen.',
+              'Download or save failed.',
+            ),
+          ),
         ),
       );
     }
@@ -4723,7 +5914,13 @@ class _MainSearchPageState extends State<MainSearchPage>
 
     if (!ok) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Link konnte nicht geöffnet werden: $url')),
+        SnackBar(
+          content: Text(
+            isEnglish
+                ? 'Could not open link: $url'
+                : 'Link konnte nicht geöffnet werden: $url',
+          ),
+        ),
       );
     }
   }
@@ -4734,8 +5931,13 @@ class _MainSearchPageState extends State<MainSearchPage>
     if (raw.isEmpty) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Kein Dateiname für die PDF-Suche verfügbar.'),
+        SnackBar(
+          content: Text(
+            tr(
+              'Kein Dateiname für die PDF-Suche verfügbar.',
+              'No file name is available for the PDF search.',
+            ),
+          ),
         ),
       );
       return;
@@ -4760,11 +5962,99 @@ class _MainSearchPageState extends State<MainSearchPage>
 
     if (!ok) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('PDF-Suche konnte nicht geöffnet werden.'),
+        SnackBar(
+          content: Text(
+            tr(
+              'PDF-Suche konnte nicht geöffnet werden.',
+              'Could not open the PDF search.',
+            ),
+          ),
         ),
       );
     }
+  }
+
+  Future<void> _reportWrongMatch(CatalogItem item) async {
+    final labelNumber = _recognizedSinkLabelNumber.trim();
+    final searchTerm = _activeHighlightTerm.trim().isNotEmpty
+        ? _activeHighlightTerm.trim()
+        : _searchController.text.trim();
+    final bodyLines = [
+      'ATool Fehlzuordnung melden',
+      '',
+      'Erkannte Nummer: ${labelNumber.isEmpty ? '-' : labelNumber}',
+      'Suchbegriff: ${searchTerm.isEmpty ? '-' : searchTerm}',
+      'Hersteller: ${item.manufacturer}',
+      'Artikel/Datei: ${item.basename}',
+      'Einbauart: ${item.type}',
+      'Artikel-ID: ${item.id}',
+      '',
+      'Richtiger Artikel, falls bekannt:',
+    ];
+    final uri = Uri(
+      scheme: 'mailto',
+      path: 'support@adler-aufmasse.de',
+      queryParameters: {
+        'subject': 'ATool: Falscher Treffer',
+        'body': bodyLines.join('\n'),
+      },
+    );
+
+    _logSearchQuality(
+      event: 'wrong_match_report',
+      searchType: 'feedback',
+      term: searchTerm,
+      usedTerm: searchTerm,
+      labelRule: _labelRuleNameForSearchTerm(searchTerm),
+      recognizedLabel: labelNumber,
+      resultCount: _results.length,
+      results: [item],
+      ocrTerms: _ocrBoxTexts,
+    );
+
+    await _openExternalLink(uri.toString());
+  }
+
+  Future<void> _reportMissingItem() async {
+    final searchTerm = _activeHighlightTerm.trim().isNotEmpty
+        ? _activeHighlightTerm.trim()
+        : _searchController.text.trim();
+    final ocrTerms = _ocrBoxTexts
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .take(12)
+        .join(', ');
+    final bodyLines = [
+      'ATool fehlenden Artikel melden',
+      '',
+      'Suchbegriff: ${searchTerm.isEmpty ? '-' : searchTerm}',
+      'Erkannte OCR-Begriffe: ${ocrTerms.isEmpty ? '-' : ocrTerms}',
+      '',
+      'Hersteller, falls bekannt:',
+      'Modell/Artikelnummer, falls bekannt:',
+      'Hinweis:',
+    ];
+    final uri = Uri(
+      scheme: 'mailto',
+      path: 'support@adler-aufmasse.de',
+      queryParameters: {
+        'subject': 'ATool: Artikel fehlt',
+        'body': bodyLines.join('\n'),
+      },
+    );
+
+    _logSearchQuality(
+      event: 'missing_item_report',
+      searchType: 'feedback',
+      term: searchTerm,
+      usedTerm: searchTerm,
+      labelRule: _labelRuleNameForSearchTerm(searchTerm),
+      recognizedLabel: _recognizedSinkLabelNumber,
+      resultCount: 0,
+      ocrTerms: _ocrBoxTexts,
+    );
+
+    await _openExternalLink(uri.toString());
   }
 
   Widget _highlightedText(
@@ -4831,8 +6121,8 @@ class _MainSearchPageState extends State<MainSearchPage>
                   Expanded(
                     child: Text(
                       _results.isEmpty
-                          ? 'OCR-Begriffe anzeigen'
-                          : 'Weitere OCR-Begriffe',
+                          ? tr('OCR-Begriffe anzeigen', 'Show OCR terms')
+                          : tr('Weitere OCR-Begriffe', 'More OCR terms'),
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 14,
@@ -4870,6 +6160,85 @@ class _MainSearchPageState extends State<MainSearchPage>
     );
   }
 
+  Widget _recognizedSinkLabelNumberPanel() {
+    final recognizedNumber = _recognizedSinkLabelNumber.trim();
+    if (recognizedNumber.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFE0E0E0)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.tag_outlined, color: Color(0xFF2C2C2C)),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  tr('Erkannte Nummer', 'Detected number'),
+                  style: const TextStyle(
+                    color: Color(0xFF666666),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  recognizedNumber,
+                  style: const TextStyle(
+                    color: Color(0xFF111111),
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _sinkLabelMatchWarningPanel() {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF8E1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFFFCC80)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.warning_amber_outlined, color: Color(0xFFE65100)),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              tr(
+                'Achtung: Hersteller-Etikett - passende Treffer. Bitte Modell und Variante prüfen.',
+                'Attention: manufacturer label - matching results. Please verify model and variant.',
+              ),
+              style: const TextStyle(
+                color: Color(0xFF5D4037),
+                fontWeight: FontWeight.w700,
+                height: 1.35,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final rawSearch = _searchController.text.trim();
@@ -4877,6 +6246,8 @@ class _MainSearchPageState extends State<MainSearchPage>
         ? _activeHighlightTerm
         : rawSearch;
     final compactHeight = MediaQuery.sizeOf(context).height < 430;
+    final compactResultsChrome =
+        _resultChromeCollapsed && _results.isNotEmpty && !_searchLoading;
     final ocrSuggestionsMaxHeight = MediaQuery.sizeOf(context).height * 0.32;
 
     return Scaffold(
@@ -4890,32 +6261,38 @@ class _MainSearchPageState extends State<MainSearchPage>
       body: SafeArea(
         child: Column(
           children: [
-            Container(
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              curve: Curves.easeOut,
               color: const Color(0xFF2C2C2C),
-              padding: compactHeight
+              padding: compactResultsChrome
+                  ? const EdgeInsets.fromLTRB(12, 8, 12, 10)
+                  : compactHeight
                   ? const EdgeInsets.fromLTRB(12, 6, 12, 8)
                   : const EdgeInsets.fromLTRB(16, 12, 16, 18),
               child: Column(
                 children: [
-                  Center(
-                    child: Image.network(
-                      'https://adler-aufmasse.de/wp-content/uploads/2026/04/ATOOL_Trans_Weiss.png',
-                      height: compactHeight ? 38 : 100,
-                      fit: BoxFit.contain,
-                      errorBuilder: (_, __, ___) => const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 20),
-                        child: Text(
-                          'ATool',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 28,
-                            fontWeight: FontWeight.bold,
+                  if (!compactResultsChrome) ...[
+                    Center(
+                      child: Image.network(
+                        'https://adler-aufmasse.de/wp-content/uploads/2026/04/ATOOL_Trans_Weiss.png',
+                        height: compactHeight ? 38 : 100,
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, __, ___) => const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 20),
+                          child: Text(
+                            'ATool',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 28,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-                  SizedBox(height: compactHeight ? 4 : 8),
+                    SizedBox(height: compactHeight ? 4 : 8),
+                  ],
                   Row(
                     children: [
                       _HeaderActionButton(
@@ -4934,6 +6311,12 @@ class _MainSearchPageState extends State<MainSearchPage>
                           smartQuotesType: SmartQuotesType.disabled,
                           textCapitalization: TextCapitalization.none,
                           textInputAction: TextInputAction.search,
+                          onTap: () {
+                            if (!_resultChromeCollapsed) return;
+                            setState(() {
+                              _resultChromeCollapsed = false;
+                            });
+                          },
                           onTapOutside: (_) {
                             FocusManager.instance.primaryFocus?.unfocus();
                           },
@@ -4942,8 +6325,9 @@ class _MainSearchPageState extends State<MainSearchPage>
                             unawaited(_handleSearchDirect(value));
                           },
                           decoration: InputDecoration(
-                            hintText:
-                                'Artikelnummer eingeben (min. $manualSearchLen Zeichen)…',
+                            hintText: isEnglish
+                                ? 'Enter item number (min. $manualSearchLen characters)…'
+                                : 'Artikelnummer eingeben (min. $manualSearchLen Zeichen)…',
                             filled: true,
                             fillColor: Colors.white,
                             contentPadding: const EdgeInsets.symmetric(
@@ -4965,8 +6349,9 @@ class _MainSearchPageState extends State<MainSearchPage>
                       ),
                     ],
                   ),
-                  SizedBox(height: compactHeight ? 6 : 14),
-                  if (!compactHeight)
+                  if (!compactResultsChrome)
+                    SizedBox(height: compactHeight ? 6 : 14),
+                  if (!compactHeight && !compactResultsChrome)
                     Align(
                       alignment: Alignment.centerLeft,
                       child: _countLoading
@@ -4986,8 +6371,11 @@ class _MainSearchPageState extends State<MainSearchPage>
                                   fontWeight: FontWeight.bold,
                                 ),
                                 children: [
-                                  const TextSpan(
-                                    text: 'Verfügbare Ausschnitte: ',
+                                  TextSpan(
+                                    text: tr(
+                                      'Verfügbare Ausschnitte: ',
+                                      'Available cut-outs: ',
+                                    ),
                                   ),
                                   WidgetSpan(
                                     alignment: PlaceholderAlignment.middle,
@@ -5051,10 +6439,13 @@ class _MainSearchPageState extends State<MainSearchPage>
                                             ),
                                           ),
                                           const SizedBox(width: 12),
-                                          const Expanded(
+                                          Expanded(
                                             child: Text(
-                                              'OCR-Suche läuft…',
-                                              style: TextStyle(
+                                              tr(
+                                                'OCR-Suche läuft…',
+                                                'OCR search running…',
+                                              ),
+                                              style: const TextStyle(
                                                 fontWeight: FontWeight.w600,
                                               ),
                                             ),
@@ -5064,7 +6455,9 @@ class _MainSearchPageState extends State<MainSearchPage>
                                             icon: const Icon(
                                               Icons.stop_circle_outlined,
                                             ),
-                                            label: const Text('OCR abbrechen'),
+                                            label: Text(
+                                              tr('OCR abbrechen', 'Cancel OCR'),
+                                            ),
                                             style: ElevatedButton.styleFrom(
                                               backgroundColor: const Color(
                                                 0xFF2C2C2C,
@@ -5079,7 +6472,7 @@ class _MainSearchPageState extends State<MainSearchPage>
                                         ],
                                       ),
                                     )
-                                  : const Text('Suche läuft…'),
+                                  : Text(tr('Suche läuft…', 'Search running…')),
                             ),
                           if (_message.isNotEmpty)
                             Padding(
@@ -5088,7 +6481,7 @@ class _MainSearchPageState extends State<MainSearchPage>
                                 _message,
                                 style: TextStyle(
                                   color: _results.isNotEmpty
-                                      ? const Color(0xFFB26A00)
+                                      ? const Color(0xFF2E7D32)
                                       : Colors.red,
                                   fontWeight: FontWeight.w600,
                                 ),
@@ -5098,17 +6491,48 @@ class _MainSearchPageState extends State<MainSearchPage>
                             _ocrSuggestionPanel(
                               maxHeight: ocrSuggestionsMaxHeight,
                             ),
+                          if (_showSinkLabelMatchWarning && _results.isNotEmpty)
+                            _recognizedSinkLabelNumberPanel(),
+                          if (_showSinkLabelMatchWarning && _results.isNotEmpty)
+                            _sinkLabelMatchWarningPanel(),
                           if (!_searchLoading &&
                               _results.isEmpty &&
                               rawSearch.length >= manualSearchLen)
-                            const Padding(
-                              padding: EdgeInsets.only(top: 20),
-                              child: Text(
-                                'Artikel noch nicht hinterlegt.',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  color: Color(0xFF666666),
-                                ),
+                            Padding(
+                              padding: const EdgeInsets.only(top: 20),
+                              child: Column(
+                                children: [
+                                  Text(
+                                    tr(
+                                      'Artikel noch nicht hinterlegt.',
+                                      'Item not yet available.',
+                                    ),
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      color: Color(0xFF666666),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  OutlinedButton.icon(
+                                    onPressed: _reportMissingItem,
+                                    icon: const Icon(
+                                      Icons.report_problem_outlined,
+                                    ),
+                                    label: Text(
+                                      tr('Artikel melden', 'Report item'),
+                                    ),
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: const Color(0xFF2C2C2C),
+                                      side: const BorderSide(
+                                        color: Color(0xFF2C2C2C),
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           Expanded(
@@ -5133,6 +6557,8 @@ class _MainSearchPageState extends State<MainSearchPage>
                                 final item = _results[index];
                                 final filename = item.basename;
                                 final einbauTyp = item.type;
+                                final installationIconType =
+                                    _dxfCutIconTypeForCatalogType(einbauTyp);
                                 final hersteller = item.manufacturer;
                                 final imageUrlSafe = item.jpgUrl ?? '';
                                 final downloadUrlSafe = item.dxfUrl ?? '';
@@ -5155,36 +6581,65 @@ class _MainSearchPageState extends State<MainSearchPage>
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
-                                      if (hersteller.isNotEmpty)
-                                        _highlightedText(
-                                          hersteller,
-                                          search,
-                                          style: const TextStyle(
-                                            color: Color(0xFF666666),
-                                            fontSize: 13,
+                                      Stack(
+                                        children: [
+                                          Padding(
+                                            padding: EdgeInsets.only(
+                                              right:
+                                                  installationIconType != null
+                                                  ? 58
+                                                  : 0,
+                                            ),
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                if (hersteller.isNotEmpty)
+                                                  _highlightedText(
+                                                    hersteller,
+                                                    search,
+                                                    style: const TextStyle(
+                                                      color: Color(0xFF666666),
+                                                      fontSize: 13,
+                                                    ),
+                                                  ),
+                                                if (hersteller.isNotEmpty)
+                                                  const SizedBox(height: 2),
+                                                _highlightedText(
+                                                  filename,
+                                                  search,
+                                                  style: const TextStyle(
+                                                    fontWeight: FontWeight.bold,
+                                                    fontSize: 16,
+                                                    color: Colors.black,
+                                                  ),
+                                                ),
+                                                if (einbauTyp.isNotEmpty) ...[
+                                                  const SizedBox(height: 2),
+                                                  _highlightedText(
+                                                    einbauTyp,
+                                                    search,
+                                                    style: const TextStyle(
+                                                      color: Color(0xFF666666),
+                                                      fontSize: 13,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ],
+                                            ),
                                           ),
-                                        ),
-                                      const SizedBox(height: 2),
-                                      _highlightedText(
-                                        filename,
-                                        search,
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 16,
-                                          color: Colors.black,
-                                        ),
+                                          if (installationIconType != null)
+                                            Positioned(
+                                              top: hersteller.isNotEmpty
+                                                  ? 4
+                                                  : 0,
+                                              right: 0,
+                                              child: _CatalogInstallationIcon(
+                                                type: installationIconType,
+                                              ),
+                                            ),
+                                        ],
                                       ),
-                                      if (einbauTyp.isNotEmpty) ...[
-                                        const SizedBox(height: 2),
-                                        _highlightedText(
-                                          einbauTyp,
-                                          search,
-                                          style: const TextStyle(
-                                            color: Color(0xFF666666),
-                                            fontSize: 13,
-                                          ),
-                                        ),
-                                      ],
                                       const SizedBox(height: 12),
                                       LayoutBuilder(
                                         builder: (context, constraints) {
@@ -5206,7 +6661,9 @@ class _MainSearchPageState extends State<MainSearchPage>
                                                 icon: const Icon(
                                                   Icons.remove_red_eye_outlined,
                                                 ),
-                                                label: const Text('Ansehen'),
+                                                label: Text(
+                                                  tr('Ansehen', 'View'),
+                                                ),
                                                 style: ElevatedButton.styleFrom(
                                                   backgroundColor: const Color(
                                                     0xFF2C2C2C,
@@ -5263,7 +6720,9 @@ class _MainSearchPageState extends State<MainSearchPage>
                                             icon: const Icon(
                                               Icons.picture_as_pdf_outlined,
                                             ),
-                                            label: const Text('PDF suchen'),
+                                            label: Text(
+                                              tr('PDF suchen', 'Search PDF'),
+                                            ),
                                             style: ElevatedButton.styleFrom(
                                               backgroundColor: const Color(
                                                 0xFF666666,
@@ -5301,6 +6760,30 @@ class _MainSearchPageState extends State<MainSearchPage>
                                           );
                                         },
                                       ),
+                                      Align(
+                                        alignment: Alignment.centerRight,
+                                        child: TextButton.icon(
+                                          onPressed: () =>
+                                              _reportWrongMatch(item),
+                                          icon: const Icon(
+                                            Icons.report_problem_outlined,
+                                            size: 18,
+                                          ),
+                                          label: Text(
+                                            tr(
+                                              'Falscher Treffer?',
+                                              'Wrong match?',
+                                            ),
+                                          ),
+                                          style: TextButton.styleFrom(
+                                            foregroundColor: const Color(
+                                              0xFF666666,
+                                            ),
+                                            visualDensity:
+                                                VisualDensity.compact,
+                                          ),
+                                        ),
+                                      ),
                                     ],
                                   ),
                                 );
@@ -5312,42 +6795,82 @@ class _MainSearchPageState extends State<MainSearchPage>
                     ),
             ),
             if (!compactHeight)
-              Container(
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                curve: Curves.easeOut,
                 color: const Color(0xFF2C2C2C),
-                padding: const EdgeInsets.fromLTRB(20, 10, 20, 12),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                padding: compactResultsChrome
+                    ? const EdgeInsets.symmetric(horizontal: 20, vertical: 6)
+                    : const EdgeInsets.fromLTRB(20, 10, 20, 12),
+                child: compactResultsChrome
+                    ? Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          _FooterLinkRow(
-                            icon: Icons.mail_outline,
-                            text: 'info@adler-aufmasse.de',
-                            onTap: () => _openExternalLink(
-                              'mailto:info@adler-aufmasse.de',
+                          Tooltip(
+                            message: 'info@adler-aufmasse.de',
+                            child: IconButton(
+                              onPressed: () => _openExternalLink(
+                                'mailto:info@adler-aufmasse.de',
+                              ),
+                              icon: const Icon(Icons.mail_outline),
+                              color: Colors.white,
                             ),
                           ),
-                          const SizedBox(height: 6),
-                          _FooterLinkRow(
-                            icon: Icons.language,
-                            text: 'www.adler-aufmasse.de',
-                            onTap: () => _openExternalLink(
-                              'https://www.adler-aufmasse.de',
+                          const SizedBox(width: 12),
+                          Tooltip(
+                            message: 'www.adler-aufmasse.de',
+                            child: IconButton(
+                              onPressed: () => _openExternalLink(
+                                'https://www.adler-aufmasse.de',
+                              ),
+                              icon: const Icon(Icons.language),
+                              color: Colors.white,
                             ),
+                          ),
+                          const SizedBox(width: 18),
+                          Image.network(
+                            'https://adler-aufmasse.de/wp-content/themes/mae/img/logo.png',
+                            height: 32,
+                            fit: BoxFit.contain,
+                            errorBuilder: (_, __, ___) =>
+                                const SizedBox.shrink(),
+                          ),
+                        ],
+                      )
+                    : Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _FooterLinkRow(
+                                  icon: Icons.mail_outline,
+                                  text: 'info@adler-aufmasse.de',
+                                  onTap: () => _openExternalLink(
+                                    'mailto:info@adler-aufmasse.de',
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                _FooterLinkRow(
+                                  icon: Icons.language,
+                                  text: 'www.adler-aufmasse.de',
+                                  onTap: () => _openExternalLink(
+                                    'https://www.adler-aufmasse.de',
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Image.network(
+                            'https://adler-aufmasse.de/wp-content/themes/mae/img/logo.png',
+                            height: 70,
+                            fit: BoxFit.contain,
+                            errorBuilder: (_, __, ___) =>
+                                const SizedBox.shrink(),
                           ),
                         ],
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    Image.network(
-                      'https://adler-aufmasse.de/wp-content/themes/mae/img/logo.png',
-                      height: 70,
-                      fit: BoxFit.contain,
-                      errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-                    ),
-                  ],
-                ),
               ),
           ],
         ),
@@ -5371,7 +6894,15 @@ class _InfoLicensePageState extends State<InfoLicensePage> {
   DeviceMeta? _deviceMeta;
   String _downloadDir = '';
   String _downloadDirLabel = '';
-  bool _showInfoAndLicense = false;
+  int _catalogCount = 0;
+  DateTime? _catalogCachedAt;
+  DateTime? _lastLicenseCheck;
+  int _offlineDaysRemaining = 0;
+  OfflineImageStatus _offlineImageStatus = const OfflineImageStatus(
+    imageCount: 0,
+    totalBytes: 0,
+    lastUpdated: null,
+  );
   DxfLayerSettings _dxfLayerSettings = const DxfLayerSettings(
     enabled: false,
     falzLayer: DxfLayerPrefs.defaultFalzLayer,
@@ -5398,10 +6929,43 @@ class _InfoLicensePageState extends State<InfoLicensePage> {
     try {
       final uuid = await AppStorage.getOrCreateDeviceUuid();
       final meta = await DeviceMetaService.load();
-      final data = await ApiService.getLicenseStatus();
       final lastDir = await DownloadPrefs.getDownloadDir();
       final lastDirLabel = await DownloadPrefs.getDownloadDirLabel();
       final dxfLayerSettings = await DxfLayerPrefs.getSettings();
+      final offlineImageStatus = await OfflineImageStore.getStatus();
+      final cachedCatalogJson = await CatalogCachePrefs.getCatalogJson();
+      final cachedCatalog = cachedCatalogJson == null || cachedCatalogJson.isEmpty
+          ? <CatalogItem>[]
+          : await compute(_parseCatalogItemsInBackground, cachedCatalogJson);
+      final catalogCachedAt = await CatalogCachePrefs.getCatalogCachedAt();
+      Map<String, dynamic>? data;
+      var licenseMessage = '';
+
+      try {
+        final response = await ApiService.getLicenseStatus();
+        if (response['success'] == true) {
+          data = response;
+          await LicenseCheckPrefs.markSuccessfulCheckNow();
+        } else {
+          licenseMessage =
+              (response['message'] ??
+                      tr(
+                        'Lizenzstatus konnte nicht geladen werden.',
+                        'Could not load the license status.',
+                      ))
+                  .toString();
+        }
+      } catch (_) {
+        if (!await LicenseCheckPrefs.isWithinOfflineGracePeriod()) {
+          licenseMessage = tr(
+            'Lizenzstatus konnte nicht geladen werden.',
+            'Could not load the license status.',
+          );
+        }
+      }
+      final offlineDaysRemaining =
+          await LicenseCheckPrefs.getOfflineDaysRemaining();
+      final lastLicenseValue = await LicenseCheckPrefs.getLastSuccessfulCheck();
 
       if (!mounted) return;
 
@@ -5410,22 +6974,27 @@ class _InfoLicensePageState extends State<InfoLicensePage> {
         _deviceMeta = meta;
         _downloadDir = lastDir ?? '';
         _downloadDirLabel = lastDirLabel ?? '';
+        _catalogCount = cachedCatalog.length;
+        _catalogCachedAt = catalogCachedAt;
+        _offlineDaysRemaining = offlineDaysRemaining;
+        _lastLicenseCheck = lastLicenseValue == null
+            ? null
+            : DateTime.fromMillisecondsSinceEpoch(lastLicenseValue);
         _dxfLayerSettings = dxfLayerSettings;
-
-        if (data['success'] == true) {
+        _offlineImageStatus = offlineImageStatus;
+        if (data != null) {
           _data = data;
-        } else {
-          _message =
-              (data['message'] ?? 'Lizenzstatus konnte nicht geladen werden.')
-                  .toString();
         }
-
+        _message = licenseMessage;
         _loading = false;
       });
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _message = 'Info-Bereich konnte nicht geladen werden.';
+        _message = tr(
+          'Info-Bereich konnte nicht geladen werden.',
+          'Could not load the information section.',
+        );
         _loading = false;
       });
     }
@@ -5446,48 +7015,62 @@ class _InfoLicensePageState extends State<InfoLicensePage> {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Hinweise zur Nutzung'),
+        title: Text(tr('Hinweise zur Nutzung', 'Usage information')),
         content: SizedBox(
           width: 520,
           child: SingleChildScrollView(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'ATool unterstützt bei der Suche nach Artikeln, Zeichnungen und Produktinformationen.',
-                  style: TextStyle(fontSize: 14, height: 1.5),
+                Text(
+                  tr(
+                    'ATool unterstützt bei der Suche nach Artikeln, Zeichnungen und Produktinformationen.',
+                    'ATool helps you search for items, drawings, and product information.',
+                  ),
+                  style: const TextStyle(fontSize: 14, height: 1.5),
                 ),
                 const SizedBox(height: 18),
 
                 _infoSection(
                   icon: Icons.info_outline,
-                  title: 'Was macht ATool?',
-                  text:
-                      'Die App dient als internes Hilfsmittel zur schnellen Orientierung im Arbeitsalltag und unterstützt bei der Identifikation von Artikeln und zugehörigen Dateien.',
+                  title: tr('Was macht ATool?', 'What does ATool do?'),
+                  text: tr(
+                    'Die App dient als internes Hilfsmittel zur schnellen Orientierung im Arbeitsalltag und unterstützt bei der Identifikation von Artikeln und zugehörigen Dateien.',
+                    'The app is an internal tool for quick guidance in everyday work and helps identify items and related files.',
+                  ),
                 ),
                 const SizedBox(height: 14),
 
                 _infoSection(
                   icon: Icons.verified_outlined,
-                  title: 'Hinweis zur Datenqualität',
-                  text:
-                      'Die angezeigten Inhalte werden sorgfältig bereitgestellt. Dennoch können Informationen im Einzelfall unvollständig, veraltet oder fehlerhaft sein. Verbindlich bleiben die jeweils freigegebenen technischen Unterlagen und internen Datenquellen.',
+                  title: tr('Hinweis zur Datenqualität', 'Data quality notice'),
+                  text: tr(
+                    'Die angezeigten Inhalte werden sorgfältig bereitgestellt. Dennoch können Informationen im Einzelfall unvollständig, veraltet oder fehlerhaft sein. Verbindlich bleiben die jeweils freigegebenen technischen Unterlagen und internen Datenquellen.',
+                    'The displayed content is prepared with care. However, individual information may be incomplete, outdated, or incorrect. Approved technical documents and internal data sources remain authoritative.',
+                  ),
                 ),
                 const SizedBox(height: 14),
 
                 _infoSection(
                   icon: Icons.document_scanner_outlined,
-                  title: 'Hinweis zur OCR-Erkennung',
-                  text:
-                      'Die automatische Texterkennung erleichtert das Erfassen von Aufklebern und Beschriftungen. Je nach Bildqualität, Perspektive oder Verschmutzung können jedoch fehlerhafte oder unvollständige Ergebnisse entstehen. Erkannte Suchbegriffe und Treffer sollten deshalb vor der weiteren Verwendung geprüft werden.',
+                  title: tr(
+                    'Hinweis zur OCR-Erkennung',
+                    'OCR recognition notice',
+                  ),
+                  text: tr(
+                    'Die automatische Texterkennung erleichtert das Erfassen von Aufklebern und Beschriftungen. Je nach Bildqualität, Perspektive oder Verschmutzung können jedoch fehlerhafte oder unvollständige Ergebnisse entstehen. Erkannte Suchbegriffe und Treffer sollten deshalb vor der weiteren Verwendung geprüft werden.',
+                    'Automatic text recognition makes it easier to capture labels and markings. Image quality, perspective, or dirt may cause incorrect or incomplete results. Please verify recognized terms and matches before using them.',
+                  ),
                 ),
                 const SizedBox(height: 14),
 
                 _infoSection(
                   icon: Icons.business_center_outlined,
-                  title: 'Nutzung',
-                  text:
-                      'Die Anwendung ist ausschließlich für den vorgesehenen betrieblichen Einsatz bestimmt.',
+                  title: tr('Nutzung', 'Use'),
+                  text: tr(
+                    'Die Anwendung ist ausschließlich für den vorgesehenen betrieblichen Einsatz bestimmt.',
+                    'The application is intended solely for its designated business use.',
+                  ),
                 ),
               ],
             ),
@@ -5496,7 +7079,7 @@ class _InfoLicensePageState extends State<InfoLicensePage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Schließen'),
+            child: Text(tr('Schließen', 'Close')),
           ),
         ],
       ),
@@ -5515,8 +7098,13 @@ class _InfoLicensePageState extends State<InfoLicensePage> {
 
     if (!opened && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Datenschutzseite konnte nicht geoeffnet werden.'),
+        SnackBar(
+          content: Text(
+            tr(
+              'Datenschutzseite konnte nicht geöffnet werden.',
+              'Could not open the privacy policy.',
+            ),
+          ),
         ),
       );
     }
@@ -5571,30 +7159,6 @@ class _InfoLicensePageState extends State<InfoLicensePage> {
     );
   }
 
-  Future<void> _editDxfLayerSettings() async {
-    final settings = await showDialog<DxfLayerSettings>(
-      context: context,
-      builder: (_) => _DxfLayerSettingsDialog(
-        initialSettings: _dxfLayerSettings,
-        validate: _validateDxfLayerSettings,
-      ),
-    );
-
-    if (settings == null) return;
-
-    await DxfLayerPrefs.setSettings(settings);
-
-    if (!mounted) return;
-
-    setState(() {
-      _dxfLayerSettings = settings;
-    });
-
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('DXF-Layer gespeichert.')));
-  }
-
   Future<void> _setDxfLayerProcessingEnabled(bool enabled) async {
     final settings = _dxfLayerSettings.copyWith(enabled: enabled);
     await DxfLayerPrefs.setSettings(settings);
@@ -5604,6 +7168,290 @@ class _InfoLicensePageState extends State<InfoLicensePage> {
     setState(() {
       _dxfLayerSettings = settings;
     });
+  }
+
+  Future<void> _setLanguage(AppLanguage language) async {
+    await appLanguageController.change(language);
+    if (!mounted) return;
+    setState(() {});
+  }
+
+  void _openAppHelp() {
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const AppHelpPage()));
+  }
+
+  void _showOcrRules() {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                tr('OCR-Regeln', 'OCR rules'),
+                style: Theme.of(
+                  sheetContext,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 14),
+              _OcrRuleInfoRow(
+                title: 'Franke',
+                value: tr(
+                  'Becken-Etikett: Nummer im Format 000.0000.000',
+                  'Sink label: number in 000.0000.000 format',
+                ),
+              ),
+              const _SettingsDivider(),
+              _OcrRuleInfoRow(
+                title: 'Blanco',
+                value: tr(
+                  'Groesste 00-Artikelnummer auf dem Etikett',
+                  'Largest 00 item number on the label',
+                ),
+              ),
+              const _SettingsDivider(),
+              _OcrRuleInfoRow(
+                title: 'BORA',
+                value: tr(
+                  'Model-Zeile, z.B. PURMU2R oder PUXU2R',
+                  'Model line, e.g. PURMU2R or PUXU2R',
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _chooseLanguage() async {
+    final language = await showModalBottomSheet<AppLanguage>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                tr('Sprache auswählen', 'Select language'),
+                style: Theme.of(
+                  sheetContext,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 10),
+              _LanguageChoiceTile(
+                title: 'Deutsch',
+                selected: appLanguageController.value == AppLanguage.german,
+                onTap: () => Navigator.of(sheetContext).pop(AppLanguage.german),
+              ),
+              _LanguageChoiceTile(
+                title: 'English',
+                selected: appLanguageController.value == AppLanguage.english,
+                onTap: () =>
+                    Navigator.of(sheetContext).pop(AppLanguage.english),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (language != null) await _setLanguage(language);
+  }
+
+  Future<({String value, String label})?> _pickDownloadDirectory() async {
+    try {
+      if (!kIsWeb && Platform.isAndroid) {
+        final result = await _MainSearchPageState._downloadChannel
+            .invokeMapMethod<String, dynamic>('pickDownloadDirectory');
+        final uri = result?['uri']?.toString() ?? '';
+        final name = result?['name']?.toString() ?? '';
+        if (uri.isEmpty) return null;
+        return (
+          value: uri,
+          label: name.isNotEmpty
+              ? name
+              : tr('Ausgewählter Ordner', 'Selected folder'),
+        );
+      }
+
+      if (!kIsWeb && Platform.isIOS) {
+        final result = await _MainSearchPageState._downloadChannel
+            .invokeMapMethod<String, dynamic>('pickDownloadDirectory');
+        final bookmark = result?['bookmark']?.toString() ?? '';
+        final name = result?['name']?.toString() ?? '';
+        if (bookmark.isEmpty) return null;
+        return (
+          value: bookmark,
+          label: name.isNotEmpty
+              ? name
+              : tr('Ausgewählter Ordner', 'Selected folder'),
+        );
+      }
+
+      final dir = await FilePicker.getDirectoryPath(
+        dialogTitle: tr('Download-Ordner wählen', 'Select download folder'),
+      );
+      if (dir == null || dir.isEmpty) return null;
+      return (value: dir, label: dir);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _changeDownloadDirectory() async {
+    final picked = await _pickDownloadDirectory();
+    if (picked == null || !mounted) return;
+
+    await DownloadPrefs.setDownloadDir(picked.value);
+    await DownloadPrefs.setDownloadDirLabel(picked.label);
+    if (!mounted) return;
+
+    setState(() {
+      _downloadDir = picked.value;
+      _downloadDirLabel = picked.label;
+    });
+  }
+
+  Future<void> _resetDownloadDirectory() async {
+    await DownloadPrefs.clearDownloadDir();
+    if (!mounted) return;
+
+    setState(() {
+      _downloadDir = '';
+      _downloadDirLabel = '';
+    });
+  }
+
+  Future<void> _showDownloadSettings() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                tr('Download-Ziel', 'Download destination'),
+                style: Theme.of(
+                  sheetContext,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 14),
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF4F4F4),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.folder_open_outlined),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        _downloadDirDisplay,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              FilledButton.icon(
+                onPressed: () {
+                  Navigator.of(sheetContext).pop();
+                  unawaited(_changeDownloadDirectory());
+                },
+                icon: const Icon(Icons.folder_outlined),
+                label: Text(tr('Ordner ändern', 'Change folder')),
+              ),
+              if (_downloadDir.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                TextButton.icon(
+                  onPressed: () {
+                    Navigator.of(sheetContext).pop();
+                    unawaited(_resetDownloadDirectory());
+                  },
+                  icon: const Icon(Icons.delete_outline),
+                  label: Text(
+                    tr('Gespeicherten Ordner löschen', 'Clear saved folder'),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openDxfSettings() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => _DxfSettingsPage(
+          initialSettings: _dxfLayerSettings,
+          validate: _validateDxfLayerSettings,
+        ),
+      ),
+    );
+
+    final settings = await DxfLayerPrefs.getSettings();
+    if (!mounted) return;
+    setState(() => _dxfLayerSettings = settings);
+  }
+
+  Future<void> _openOfflineImages() async {
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const _OfflineImagesPage()));
+    final status = await OfflineImageStore.getStatus();
+    if (mounted) setState(() => _offlineImageStatus = status);
+  }
+
+  Future<void> _openSiteReadinessCheck() async {
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const _SiteReadinessPage()));
+    final status = await OfflineImageStore.getStatus();
+    if (mounted) setState(() => _offlineImageStatus = status);
+  }
+
+  void _openAccountDetails() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => _AccountLicensePage(
+          data: _data,
+          deviceUuid: _deviceUuid,
+          deviceMeta: _deviceMeta,
+        ),
+      ),
+    );
+  }
+
+  void _openLegalDetails() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => _LegalSettingsPage(
+          onShowUsageInformation: _showLicenseAgreement,
+          onOpenPrivacyPolicy: _openPrivacyPolicy,
+        ),
+      ),
+    );
   }
 
   String? _validateDxfLayerSettings(
@@ -5621,23 +7469,31 @@ class _InfoLicensePageState extends State<InfoLicensePage> {
     int? konstruktionColor,
   ) {
     final falzError = _validateDxfLayerName(falzLayer);
-    if (falzError != null) return 'Falz: $falzError';
+    if (falzError != null) return '${tr('Falz', 'Rebate')}: $falzError';
 
     final gesaegtError = _validateDxfLayerName(gesaegtLayer);
-    if (gesaegtError != null) return 'Gesägt: $gesaegtError';
+    if (gesaegtError != null) {
+      return '${tr('Gesägt', 'Saw cut')}: $gesaegtError';
+    }
 
     final auflageError = _validateDxfLayerName(auflageLayer);
-    if (auflageError != null) return 'Auflage: $auflageError';
+    if (auflageError != null) {
+      return '${tr('Auflage', 'Support')}: $auflageError';
+    }
 
     final unterbauError = _validateDxfLayerName(unterbauLayer);
-    if (unterbauError != null) return 'Unterbau: $unterbauError';
+    if (unterbauError != null) {
+      return '${tr('Unterbau', 'Substructure')}: $unterbauError';
+    }
 
     final bohrungError = _validateDxfLayerName(bohrungLayer);
-    if (bohrungError != null) return 'Bohrungen: $bohrungError';
+    if (bohrungError != null) {
+      return '${tr('Bohrungen', 'Drill holes')}: $bohrungError';
+    }
 
     final konstruktionError = _validateDxfLayerName(konstruktionLayer);
     if (konstruktionError != null) {
-      return 'Konstruktion: $konstruktionError';
+      return '${tr('Konstruktion', 'Construction')}: $konstruktionError';
     }
 
     final colorError = _validateDxfColors({
@@ -5651,7 +7507,10 @@ class _InfoLicensePageState extends State<InfoLicensePage> {
     if (colorError != null) return colorError;
 
     if (falzLayer.toUpperCase() == gesaegtLayer.toUpperCase()) {
-      return 'Die beiden Ziellayer müssen unterschiedlich sein.';
+      return tr(
+        'Die beiden Ziellayer müssen unterschiedlich sein.',
+        'The two target layers must be different.',
+      );
     }
 
     return null;
@@ -5662,11 +7521,15 @@ class _InfoLicensePageState extends State<InfoLicensePage> {
       final color = entry.value;
 
       if (color == null) {
-        return '${entry.key}: Bitte eine Farbe von 1 bis 255 eintragen.';
+        return isEnglish
+            ? '${entry.key}: Enter a color from 1 to 255.'
+            : '${entry.key}: Bitte eine Farbe von 1 bis 255 eintragen.';
       }
 
       if (color < 1 || color > 255) {
-        return '${entry.key}: Die Farbe muss zwischen 1 und 255 liegen.';
+        return isEnglish
+            ? '${entry.key}: The color must be between 1 and 255.'
+            : '${entry.key}: Die Farbe muss zwischen 1 und 255 liegen.';
       }
     }
 
@@ -5674,28 +7537,42 @@ class _InfoLicensePageState extends State<InfoLicensePage> {
   }
 
   String? _validateDxfLayerName(String layerName) {
-    if (layerName.isEmpty) return 'Bitte einen Layernamen eintragen.';
+    if (layerName.isEmpty) {
+      return tr('Bitte einen Layernamen eintragen.', 'Enter a layer name.');
+    }
     if (layerName.contains(RegExp(r'\s'))) {
-      return 'Achtung: Es dürfen keine Leerzeichen im Layernamen vorhanden sein.';
+      return tr(
+        'Achtung: Es dürfen keine Leerzeichen im Layernamen vorhanden sein.',
+        'Layer names must not contain spaces.',
+      );
     }
     if (layerName.contains(RegExp(r'[<>/":;?*|=]'))) {
-      return 'Der Layername enthält ein ungültiges Zeichen.';
+      return tr(
+        'Der Layername enthält ein ungültiges Zeichen.',
+        'The layer name contains an invalid character.',
+      );
     }
     if (layerName.contains('\n') || layerName.contains('\r')) {
-      return 'Der Layername darf keinen Zeilenumbruch enthalten.';
+      return tr(
+        'Der Layername darf keinen Zeilenumbruch enthalten.',
+        'The layer name must not contain a line break.',
+      );
     }
 
     try {
       latin1.encode(layerName);
     } catch (_) {
-      return 'Der Layername enthält ein Zeichen, das DXF nicht speichern kann.';
+      return tr(
+        'Der Layername enthält ein Zeichen, das DXF nicht speichern kann.',
+        'The layer name contains a character that DXF cannot store.',
+      );
     }
 
     return null;
   }
 
   String get _downloadDirDisplay {
-    if (_downloadDir.isEmpty) return 'Noch nicht gewählt';
+    if (_downloadDir.isEmpty) return tr('Noch nicht gewählt', 'Not selected');
 
     final label = _downloadDirLabel.trim();
     if (label.isNotEmpty && !label.startsWith('ios-bookmark://')) {
@@ -5703,27 +7580,35 @@ class _InfoLicensePageState extends State<InfoLicensePage> {
     }
 
     if (_downloadDir.startsWith('ios-bookmark://')) {
-      return 'Ausgewählter Ordner';
+      return tr('Ausgewählter Ordner', 'Selected folder');
     }
 
     return _downloadDir;
+  }
+
+  String _formatSettingsDate(DateTime? value) {
+    if (value == null) return tr('Noch nie', 'Never');
+    final date = MaterialLocalizations.of(context).formatMediumDate(value);
+    final time = TimeOfDay.fromDateTime(value).format(context);
+    return '$date Â· $time';
   }
 
   @override
   Widget build(BuildContext context) {
     final firm = _data?['firm'] as Map<String, dynamic>?;
     final user = _data?['user'] as Map<String, dynamic>?;
-    final device = _data?['device'] as Map<String, dynamic>?;
-
     final firmStatus = (firm?['status'] ?? '').toString();
-    final deviceStatus = (device?['status'] ?? '').toString();
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFF5F5F5),
       appBar: AppBar(
-        title: const Text('Einstellungen'),
+        title: Text(tr('Einstellungen', 'Settings')),
         actions: [
-          IconButton(onPressed: _init, icon: const Icon(Icons.refresh)),
+          IconButton(
+            tooltip: tr('Aktualisieren', 'Refresh'),
+            onPressed: _init,
+            icon: const Icon(Icons.refresh),
+          ),
         ],
       ),
       body: _loading
@@ -5756,256 +7641,228 @@ class _InfoLicensePageState extends State<InfoLicensePage> {
                               ),
                             ),
                           ),
-                        _InfoCard(
-                          title: 'Download-Ziel',
-                          icon: Icons.folder_outlined,
+                        Text(
+                          tr(
+                            'ATool nach deinen Bedürfnissen einrichten.',
+                            'Set up ATool to suit your workflow.',
+                          ),
+                          style: const TextStyle(
+                            color: Colors.black54,
+                            fontSize: 15,
+                          ),
+                        ),
+                        const SizedBox(height: 22),
+                        _SettingsSection(
+                          title: tr('STATUS', 'STATUS'),
                           children: [
-                            _InfoRow(
-                              label: 'Ordner',
-                              value: _downloadDirDisplay,
+                            _ReadinessRow(
+                              icon: Icons.inventory_2_outlined,
+                              title: tr('Artikelkatalog', 'Item catalog'),
+                              ready: _catalogCount > 0,
+                              warning: false,
+                              value: _catalogCount > 0
+                                  ? isEnglish
+                                        ? '$_catalogCount items'
+                                        : '$_catalogCount Artikel'
+                                  : tr('Nicht verfÃ¼gbar', 'Not available'),
+                              detail: _formatSettingsDate(_catalogCachedAt),
+                            ),
+                            const _SettingsDivider(),
+                            _ReadinessRow(
+                              icon: Icons.photo_library_outlined,
+                              title: tr('Offline-Bilder', 'Offline images'),
+                              ready: _offlineImageStatus.imageCount > 0,
+                              warning: false,
+                              value: _offlineImageStatus.imageCount == 0
+                                  ? tr(
+                                      'Keine Bilder gespeichert',
+                                      'No images saved',
+                                    )
+                                  : isEnglish
+                                  ? '${_offlineImageStatus.imageCount} images'
+                                  : '${_offlineImageStatus.imageCount} Bilder',
+                              detail: _formatStorageSize(
+                                _offlineImageStatus.totalBytes,
+                              ),
+                            ),
+                            const _SettingsDivider(),
+                            _ReadinessRow(
+                              icon: Icons.verified_user_outlined,
+                              title: tr('Offline-Lizenz', 'Offline license'),
+                              ready: _offlineDaysRemaining > 0,
+                              warning: false,
+                              value: _offlineDaysRemaining > 0
+                                  ? isEnglish
+                                        ? '$_offlineDaysRemaining days remaining'
+                                        : 'Noch $_offlineDaysRemaining Tage'
+                                  : tr(
+                                      'Erneute PrÃ¼fung nÃ¶tig',
+                                      'New check required',
+                                    ),
+                              detail: _formatSettingsDate(_lastLicenseCheck),
+                            ),
+                            const _SettingsDivider(),
+                            _ReadinessRow(
+                              icon: Icons.info_outline,
+                              title: tr('App-Version', 'App version'),
+                              ready: true,
+                              warning: false,
+                              value: _deviceMeta?.appVersion ?? '-',
+                              detail: _deviceMeta?.osVersion ?? '',
                             ),
                           ],
                         ),
-                        SizedBox(
-                          width: double.infinity,
-                          child: OutlinedButton.icon(
-                            onPressed: () async {
-                              await DownloadPrefs.clearDownloadDir();
-                              if (!mounted) return;
-
-                              setState(() {
-                                _downloadDir = '';
-                                _downloadDirLabel = '';
-                              });
-
-                              ScaffoldMessenger.of(this.context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'Gemerktes Download-Ziel zurückgesetzt.',
-                                  ),
-                                ),
-                              );
-                            },
-                            icon: const Icon(Icons.delete_outline),
-                            label: const Text('Download-Ziel zurücksetzen'),
-                          ),
-                        ),
-
-                        _InfoCard(
-                          title: 'DXF-Layer bearbeiten',
-                          icon: Icons.layers_outlined,
+                        const SizedBox(height: 22),
+                        _SettingsSection(
+                          title: tr('SUCHE & OCR', 'SEARCH & OCR'),
                           children: [
-                            SwitchListTile(
-                              value: _dxfLayerSettings.enabled,
-                              onChanged: _setDxfLayerProcessingEnabled,
-                              contentPadding: EdgeInsets.zero,
-                              title: const Text(
-                                'Layer beim DXF-Download automatisch anpassen',
+                            _SettingsTile(
+                              icon: Icons.health_and_safety_outlined,
+                              title: tr(
+                                'Baustellen-Check',
+                                'Site readiness check',
                               ),
-                              subtitle: const Text(
-                                'Deaktiviert: Die DXF-Datei wird unverändert im Original heruntergeladen.',
+                              subtitle: tr(
+                                'Lizenz, Katalog und Offline-Bilder prüfen',
+                                'Check license, catalog, and offline images',
                               ),
+                              onTap: _openSiteReadinessCheck,
                             ),
-                            _InfoRow(
-                              label: 'Flächenbündig (aussen)',
-                              value:
-                                  '${_dxfLayerSettings.falzLayer} / ${_dxfAciColorName(_dxfLayerSettings.falzColor)}',
+                            const _SettingsDivider(),
+                            _SettingsTile(
+                              icon: Icons.document_scanner_outlined,
+                              title: tr('OCR-Regeln', 'OCR rules'),
+                              subtitle: tr(
+                                'Franke, Blanco und BORA Etiketten erkennen',
+                                'Recognize Franke, Blanco, and BORA labels',
+                              ),
+                              onTap: _showOcrRules,
                             ),
-                            _InfoRow(
-                              label: 'Flächenbündig (innen)',
-                              value:
-                                  '${_dxfLayerSettings.gesaegtLayer} / ${_dxfAciColorName(_dxfLayerSettings.gesaegtColor)}',
+                            const _SettingsDivider(),
+                            _SettingsTile(
+                              icon: Icons.help_outline,
+                              title: tr(
+                                'So funktioniert ATool',
+                                'How to use ATool',
+                              ),
+                              subtitle: tr(
+                                'Oberfläche und Funktionen erklärt',
+                                'Learn about the interface and features',
+                              ),
+                              onTap: _openAppHelp,
                             ),
-                            _InfoRow(
-                              label: 'Auflage',
-                              value:
-                                  '${_dxfLayerSettings.auflageLayer} / ${_dxfAciColorName(_dxfLayerSettings.auflageColor)}',
+                          ],
+                        ),
+                        const SizedBox(height: 22),
+                        _SettingsSection(
+                          title: tr('DATEIEN & DXF', 'FILES & DXF'),
+                          children: [
+                            _SettingsTile(
+                              icon: Icons.folder_outlined,
+                              title: tr('Download-Ordner', 'Download folder'),
+                              subtitle: _downloadDirDisplay,
+                              onTap: _showDownloadSettings,
                             ),
-                            _InfoRow(
-                              label: 'Unterbau',
-                              value:
-                                  '${_dxfLayerSettings.unterbauLayer} / ${_dxfAciColorName(_dxfLayerSettings.unterbauColor)}',
+                            const _SettingsDivider(),
+                            _SettingsTile(
+                              icon: Icons.offline_pin_outlined,
+                              title: tr('Offline-Bilder', 'Offline images'),
+                              subtitle: _offlineImageStatus.imageCount == 0
+                                  ? tr(
+                                      'Noch keine Bilder gespeichert',
+                                      'No images saved yet',
+                                    )
+                                  : isEnglish
+                                  ? '${_offlineImageStatus.imageCount} images · ${_formatStorageSize(_offlineImageStatus.totalBytes)}'
+                                  : '${_offlineImageStatus.imageCount} Bilder · ${_formatStorageSize(_offlineImageStatus.totalBytes)}',
+                              onTap: _openOfflineImages,
                             ),
-                            _InfoRow(
-                              label: 'Bohrungen',
-                              value:
-                                  '${_dxfLayerSettings.bohrungLayer} / ${_dxfAciColorName(_dxfLayerSettings.bohrungColor)}',
-                            ),
-                            _InfoRow(
-                              label: 'Konstruktion',
-                              value:
-                                  '${_dxfLayerSettings.konstruktionLayer} / ${_dxfAciColorName(_dxfLayerSettings.konstruktionColor)}',
-                            ),
-                            const Text(
-                              'Passen Sie die DXF-Layer beim Download automatisch an Ihre CNC-, Säge-, Wasserstrahl- oder andere Maschinen an.',
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: Colors.black54,
-                                height: 1.35,
+                            const _SettingsDivider(),
+                            _SettingsTile(
+                              icon: Icons.layers_outlined,
+                              title: tr('DXF-Layer', 'DXF layers'),
+                              subtitle: _dxfLayerSettings.enabled
+                                  ? tr(
+                                      'Automatische Anpassung aktiviert',
+                                      'Automatic adjustment enabled',
+                                    )
+                                  : tr(
+                                      'Originaldateien bleiben unverändert',
+                                      'Original files remain unchanged',
+                                    ),
+                              onTap: _openDxfSettings,
+                              trailing: Switch(
+                                value: _dxfLayerSettings.enabled,
+                                onChanged: _setDxfLayerProcessingEnabled,
                               ),
                             ),
                           ],
                         ),
+                        const SizedBox(height: 22),
+                        _SettingsSection(
+                          title: tr('KONTO & SUPPORT', 'ACCOUNT & SUPPORT'),
+                          children: [
+                            _SettingsTile(
+                              icon: Icons.translate,
+                              title: tr('Sprache', 'Language'),
+                              value:
+                                  appLanguageController.value ==
+                                      AppLanguage.english
+                                  ? 'English'
+                                  : 'Deutsch',
+                              onTap: _chooseLanguage,
+                            ),
+                            const _SettingsDivider(),
+                            _SettingsTile(
+                              icon: Icons.person_outline,
+                              title: tr('Benutzer & Firma', 'User & company'),
+                              subtitle: [
+                                '${user?['email'] ?? ''}'.trim(),
+                                '${firm?['name'] ?? ''}'.trim(),
+                              ].where((value) => value.isNotEmpty).join(' · '),
+                              onTap: _openAccountDetails,
+                            ),
+                            const _SettingsDivider(),
+                            _SettingsTile(
+                              icon: Icons.verified_outlined,
+                              title: tr('Lizenzstatus', 'License status'),
+                              subtitle: tr(
+                                'Nach erfolgreicher Prüfung 30 Tage offline nutzbar',
+                                'Available offline for 30 days after a successful check',
+                              ),
+                              onTap: _openAccountDetails,
+                              trailing: _SettingsStatusBadge(
+                                status: firmStatus,
+                              ),
+                            ),
+                            const _SettingsDivider(),
+                            _SettingsTile(
+                              icon: Icons.privacy_tip_outlined,
+                              title: tr(
+                                'Datenschutz & Nutzung',
+                                'Privacy & usage',
+                              ),
+                              onTap: _openLegalDetails,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 28),
                         SizedBox(
                           width: double.infinity,
                           child: OutlinedButton.icon(
-                            onPressed: _editDxfLayerSettings,
-                            icon: const Icon(Icons.edit_outlined),
-                            label: const Text('DXF-Layer ändern'),
-                          ),
-                        ),
-
-                        const SizedBox(height: 12),
-                        SizedBox(
-                          width: double.infinity,
-                          child: OutlinedButton.icon(
-                            onPressed: () {
-                              setState(() {
-                                _showInfoAndLicense = !_showInfoAndLicense;
-                              });
-                            },
-                            icon: Icon(
-                              _showInfoAndLicense
-                                  ? Icons.expand_less
-                                  : Icons.info_outline,
-                            ),
-                            label: Text(
-                              _showInfoAndLicense
-                                  ? 'Info & Lizenz ausblenden'
-                                  : 'Info & Lizenz',
+                            onPressed: _logout,
+                            icon: const Icon(Icons.logout),
+                            label: Text(tr('Abmelden', 'Log out')),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: const Color(0xFFB3261E),
+                              side: const BorderSide(color: Color(0x33B3261E)),
+                              padding: const EdgeInsets.symmetric(vertical: 14),
                             ),
                           ),
                         ),
-
-                        if (_showInfoAndLicense) ...[
-                          const SizedBox(height: 18),
-                          const Text(
-                            'Lizenzübersicht',
-                            style: TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          _InfoCard(
-                            title: 'Benutzer',
-                            icon: Icons.person_outline,
-                            children: [
-                              _InfoRow(
-                                label: 'Name',
-                                value: '${user?['name'] ?? ''}',
-                              ),
-                              _InfoRow(
-                                label: 'E-Mail',
-                                value: '${user?['email'] ?? ''}',
-                              ),
-                              _InfoRow(
-                                label: 'Rolle',
-                                value: '${user?['role'] ?? ''}',
-                              ),
-                            ],
-                          ),
-                          _InfoCard(
-                            title: 'Firma',
-                            icon: Icons.business_outlined,
-                            children: [
-                              _InfoRow(
-                                label: 'Name',
-                                value: '${firm?['name'] ?? ''}',
-                              ),
-                              _StatusRow(label: 'Status', value: firmStatus),
-                              _InfoRow(
-                                label: 'Max Geräte',
-                                value: '${firm?['max_devices'] ?? ''}',
-                              ),
-                              _InfoRow(
-                                label: 'Lizenz bis',
-                                value: '${firm?['license_end'] ?? ''}',
-                              ),
-                              _InfoRow(
-                                label: 'Tage übrig',
-                                value: '${firm?['days_left'] ?? ''}',
-                              ),
-                            ],
-                          ),
-                          _InfoCard(
-                            title: 'Gerät',
-                            icon: Icons.tablet_android_outlined,
-                            children: [
-                              _InfoRow(
-                                label: 'Lokale Geräte-ID',
-                                value: _deviceUuid,
-                              ),
-                              _InfoRow(
-                                label: 'Erkanntes Gerät',
-                                value: _deviceMeta?.deviceName ?? '',
-                              ),
-                              _InfoRow(
-                                label: 'Erkanntes OS',
-                                value: _deviceMeta?.osVersion ?? '',
-                              ),
-                              _InfoRow(
-                                label: 'App-Version',
-                                value: _deviceMeta?.appVersion ?? '',
-                              ),
-                              _InfoRow(
-                                label: 'Server UUID',
-                                value: '${device?['device_uuid'] ?? ''}',
-                              ),
-                              _InfoRow(
-                                label: 'Server-Name',
-                                value: '${device?['device_name'] ?? ''}',
-                              ),
-                              _StatusRow(
-                                label: 'Gerätestatus',
-                                value: deviceStatus,
-                              ),
-                            ],
-                          ),
-                          SizedBox(
-                            width: double.infinity,
-                            child: OutlinedButton.icon(
-                              onPressed: _showLicenseAgreement,
-                              icon: const Icon(Icons.description_outlined),
-                              label: const Text('Lizenzvereinbarung anzeigen'),
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          SizedBox(
-                            width: double.infinity,
-                            child: OutlinedButton.icon(
-                              onPressed: _openPrivacyPolicy,
-                              icon: const Icon(Icons.privacy_tip_outlined),
-                              label: const Text('Datenschutz'),
-                            ),
-                          ),
-                        ],
                         const SizedBox(height: 24),
                       ],
                     ),
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-                  decoration: const BoxDecoration(
-                    border: Border(top: BorderSide(color: Color(0xFFE5E5E5))),
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: () => Navigator.of(context).pop(),
-                          child: const Text('Schließen'),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: _logout,
-                          child: const Text('Logout'),
-                        ),
-                      ),
-                    ],
                   ),
                 ),
               ],
@@ -6014,14 +7871,1495 @@ class _InfoLicensePageState extends State<InfoLicensePage> {
   }
 }
 
+class _OcrRuleInfoRow extends StatelessWidget {
+  final String title;
+  final String value;
+
+  const _OcrRuleInfoRow({required this.title, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: const Color(0xFFF0F0F0),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text(
+              title.isEmpty ? '?' : title.substring(0, 1),
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF2C2C2C),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  value,
+                  style: const TextStyle(color: Colors.black54, height: 1.35),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SettingsSection extends StatelessWidget {
+  final String title;
+  final List<Widget> children;
+
+  const _SettingsSection({required this.title, required this.children});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 8),
+          child: Text(
+            title,
+            style: const TextStyle(
+              color: Color(0xFF6B6B6B),
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.8,
+            ),
+          ),
+        ),
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFE4E4E4)),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: Column(children: children),
+        ),
+      ],
+    );
+  }
+}
+
+class _SettingsTile extends StatelessWidget {
+  final IconData? icon;
+  final Widget? iconWidget;
+  final String title;
+  final String? subtitle;
+  final String? value;
+  final Widget? trailing;
+  final VoidCallback? onTap;
+
+  const _SettingsTile({
+    this.icon,
+    this.iconWidget,
+    required this.title,
+    this.subtitle,
+    this.value,
+    this.trailing,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    Widget? effectiveTrailing = trailing;
+    if (effectiveTrailing == null && (value != null || onTap != null)) {
+      effectiveTrailing = Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (value != null)
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 130),
+              child: Text(
+                value!,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: Colors.black54, fontSize: 14),
+              ),
+            ),
+          if (onTap != null) ...[
+            const SizedBox(width: 6),
+            const Icon(Icons.chevron_right, color: Colors.black38),
+          ],
+        ],
+      );
+    }
+
+    return ListTile(
+      onTap: onTap,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+      leading: Container(
+        width: 56,
+        height: 52,
+        decoration: BoxDecoration(
+          color: const Color(0xFFF0F0F0),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child:
+            iconWidget ??
+            Icon(
+              icon ?? Icons.circle_outlined,
+              color: const Color(0xFF2C2C2C),
+              size: 26,
+            ),
+      ),
+      title: Text(
+        title,
+        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+      ),
+      subtitle: subtitle == null || subtitle!.isEmpty
+          ? null
+          : Text(
+              subtitle!,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: Colors.black54, fontSize: 13),
+            ),
+      trailing: effectiveTrailing,
+    );
+  }
+}
+
+class _SettingsDivider extends StatelessWidget {
+  const _SettingsDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Divider(height: 1, indent: 86, color: Color(0xFFE8E8E8));
+  }
+}
+
+enum _DxfCutIconType {
+  auflage('assets/icons/einbauarten/auflage.svg'),
+  unterbau('assets/icons/einbauarten/unterbau.svg'),
+  flaechenbuendig('assets/icons/einbauarten/flaechenbuendig.svg');
+
+  final String assetPath;
+
+  const _DxfCutIconType(this.assetPath);
+}
+
+class _DxfCutIcon extends StatelessWidget {
+  final _DxfCutIconType type;
+  final double size;
+
+  const _DxfCutIcon(this.type, {this.size = 42});
+
+  @override
+  Widget build(BuildContext context) {
+    return SvgPicture.asset(
+      type.assetPath,
+      width: size,
+      height: size,
+      fit: BoxFit.contain,
+    );
+  }
+}
+
+class _DxfInstallationPreview extends StatelessWidget {
+  const _DxfInstallationPreview();
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: const [
+        Expanded(
+          child: _DxfInstallationPreviewItem(
+            type: _DxfCutIconType.auflage,
+            label: 'Auflage',
+          ),
+        ),
+        Expanded(
+          child: _DxfInstallationPreviewItem(
+            type: _DxfCutIconType.unterbau,
+            label: 'Unterbau',
+          ),
+        ),
+        Expanded(
+          child: _DxfInstallationPreviewItem(
+            type: _DxfCutIconType.flaechenbuendig,
+            label: 'Flächenbündig',
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _DxfInstallationPreviewItem extends StatelessWidget {
+  final _DxfCutIconType type;
+  final String label;
+
+  const _DxfInstallationPreviewItem({required this.type, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _DxfCutIcon(type, size: 56),
+          const SizedBox(height: 8),
+          Text(
+            label,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CatalogInstallationIcon extends StatelessWidget {
+  final _DxfCutIconType type;
+
+  const _CatalogInstallationIcon({required this.type});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 54,
+      height: 42,
+      child: Align(
+        alignment: Alignment.center,
+        child: _DxfCutIcon(type, size: 44),
+      ),
+    );
+  }
+}
+
+_DxfCutIconType? _dxfCutIconTypeForCatalogType(String value) {
+  final normalized = _normalizeCatalogSearchText(
+    value,
+  ).replaceAll(RegExp(r'[^a-z0-9]'), '');
+
+  if (normalized.contains('unterbau')) return _DxfCutIconType.unterbau;
+  if (normalized.contains('auflage') ||
+      normalized.contains('slimtop') ||
+      normalized.contains('aufbau')) {
+    return _DxfCutIconType.auflage;
+  }
+  if (normalized.contains('flachenbundig') ||
+      normalized.contains('flchenbndig') ||
+      normalized.contains('flaechenbuendig') ||
+      normalized.contains('flaechenbundig') ||
+      normalized.contains('falz')) {
+    return _DxfCutIconType.flaechenbuendig;
+  }
+
+  return null;
+}
+
+class _SettingsStatusBadge extends StatelessWidget {
+  final String status;
+
+  const _SettingsStatusBadge({required this.status});
+
+  @override
+  Widget build(BuildContext context) {
+    final normalized = status.toLowerCase();
+    final label = switch (normalized) {
+      'active' => tr('Aktiv', 'Active'),
+      'blocked' => tr('Gesperrt', 'Blocked'),
+      'expired' => tr('Abgelaufen', 'Expired'),
+      'test' => tr('Test', 'Trial'),
+      'removed' => tr('Entfernt', 'Removed'),
+      _ => status.isEmpty ? '—' : status,
+    };
+    final color = statusColor(status);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontWeight: FontWeight.w700,
+          fontSize: 12,
+        ),
+      ),
+    );
+  }
+}
+
+class _LanguageChoiceTile extends StatelessWidget {
+  final String title;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _LanguageChoiceTile({
+    required this.title,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      onTap: onTap,
+      contentPadding: EdgeInsets.zero,
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+      trailing: selected
+          ? const Icon(Icons.check_circle, color: Color(0xFF2E7D32))
+          : const Icon(Icons.circle_outlined, color: Colors.black26),
+    );
+  }
+}
+
+class _SiteReadinessPage extends StatefulWidget {
+  const _SiteReadinessPage();
+
+  @override
+  State<_SiteReadinessPage> createState() => _SiteReadinessPageState();
+}
+
+class _SiteReadinessPageState extends State<_SiteReadinessPage> {
+  List<CatalogItem> _catalog = [];
+  OfflineImageStatus _imageStatus = const OfflineImageStatus(
+    imageCount: 0,
+    totalBytes: 0,
+    lastUpdated: null,
+  );
+  DateTime? _lastLicenseCheck;
+  DateTime? _catalogUpdatedAt;
+  OfflineImageSyncCancellation? _cancellation;
+  bool _loading = true;
+  bool _updating = false;
+  int _offlineDaysRemaining = 0;
+  int _processedImages = 0;
+  int _totalImages = 0;
+  String _message = '';
+
+  int get _expectedImageCount => _catalog
+      .where((item) => item.jpgExists)
+      .map((item) => item.jpgUrl?.trim() ?? '')
+      .where((url) => url.isNotEmpty)
+      .toSet()
+      .length;
+
+  bool get _licenseReady => _offlineDaysRemaining > 0;
+  bool get _catalogReady => _catalog.isNotEmpty;
+  bool get _imagesReady =>
+      _expectedImageCount > 0 && _imageStatus.imageCount >= _expectedImageCount;
+  bool get _fullyReady => _licenseReady && _catalogReady && _imagesReady;
+  bool get _partlyReady =>
+      !_fullyReady &&
+      _licenseReady &&
+      _catalogReady &&
+      _imageStatus.imageCount > 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadStatus();
+  }
+
+  @override
+  void dispose() {
+    _cancellation?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _loadStatus() async {
+    try {
+      final cachedJson = await CatalogCachePrefs.getCatalogJson();
+      final catalog = cachedJson == null || cachedJson.isEmpty
+          ? <CatalogItem>[]
+          : await compute(_parseCatalogItemsInBackground, cachedJson);
+      final imageStatus = await OfflineImageStore.getStatus();
+      final daysRemaining = await LicenseCheckPrefs.getOfflineDaysRemaining();
+      final lastLicenseValue = await LicenseCheckPrefs.getLastSuccessfulCheck();
+      final catalogUpdatedAt = await CatalogCachePrefs.getCatalogCachedAt();
+      if (!mounted) return;
+
+      setState(() {
+        _catalog = catalog;
+        _imageStatus = imageStatus;
+        _offlineDaysRemaining = daysRemaining;
+        _lastLicenseCheck = lastLicenseValue == null
+            ? null
+            : DateTime.fromMillisecondsSinceEpoch(lastLicenseValue);
+        _catalogUpdatedAt = catalogUpdatedAt;
+        _loading = false;
+      });
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _message = tr(
+            'Der Offline-Status konnte nicht vollständig geprüft werden.',
+            'The offline status could not be checked completely.',
+          );
+        });
+      }
+    }
+  }
+
+  Future<void> _updateAll() async {
+    if (_updating) return;
+    final cancellation = OfflineImageSyncCancellation();
+    _cancellation = cancellation;
+    setState(() {
+      _updating = true;
+      _processedImages = 0;
+      _totalImages = _expectedImageCount;
+      _message = '';
+    });
+
+    var connectionSucceeded = false;
+    try {
+      final license = await ApiService.getLicenseStatus();
+      if (license['success'] == true) {
+        await LicenseCheckPrefs.markSuccessfulCheckNow();
+        connectionSucceeded = true;
+      }
+    } catch (_) {}
+
+    List<CatalogItem> catalog = _catalog;
+    try {
+      final response = await http
+          .get(Uri.parse(AppConfig.catalogUrl))
+          .timeout(const Duration(seconds: 20));
+      if (response.statusCode == 200) {
+        final freshCatalog = await compute(
+          _parseCatalogItemsInBackground,
+          response.body,
+        );
+        await CatalogCachePrefs.setCatalogJson(response.body);
+        catalog = freshCatalog;
+        connectionSucceeded = true;
+      }
+    } catch (_) {}
+
+    if (!cancellation.isCancelled &&
+        connectionSucceeded &&
+        catalog.isNotEmpty) {
+      await OfflineImageStore.synchronize(
+        catalog,
+        cancellation: cancellation,
+        onProgress: (processed, total, available, failed) {
+          if (!mounted) return;
+          setState(() {
+            _processedImages = processed;
+            _totalImages = total;
+          });
+        },
+      );
+    }
+
+    if (!mounted) return;
+    await _loadStatus();
+    if (!mounted) return;
+    setState(() {
+      _updating = false;
+      _cancellation = null;
+      if (cancellation.isCancelled) {
+        _message = tr(
+          'Aktualisierung abgebrochen. Bereits gespeicherte Daten bleiben erhalten.',
+          'Update canceled. Previously saved data is kept.',
+        );
+      } else if (!connectionSucceeded) {
+        _message = tr(
+          'Keine Verbindung. Der vorhandene Offline-Stand bleibt erhalten.',
+          'No connection. Existing offline data is kept.',
+        );
+      }
+    });
+  }
+
+  String _formatDate(DateTime? value) {
+    if (value == null) return tr('Noch nie', 'Never');
+    final date = MaterialLocalizations.of(context).formatMediumDate(value);
+    final time = TimeOfDay.fromDateTime(value).format(context);
+    return '$date · $time';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final statusColorValue = _fullyReady
+        ? const Color(0xFF2E7D32)
+        : _partlyReady
+        ? const Color(0xFFB26A00)
+        : const Color(0xFFB3261E);
+    final statusIcon = _fullyReady
+        ? Icons.check_circle_outline
+        : _partlyReady
+        ? Icons.warning_amber_rounded
+        : Icons.error_outline;
+    final statusTitle = _fullyReady
+        ? tr('Offline bereit', 'Ready offline')
+        : _partlyReady
+        ? tr('Eingeschränkt bereit', 'Partly ready')
+        : tr('Nicht offline bereit', 'Not ready offline');
+    final progress = _totalImages <= 0 ? null : _processedImages / _totalImages;
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF5F5F5),
+      appBar: AppBar(
+        title: Text(tr('Baustellen-Check', 'Site readiness check')),
+      ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : ListView(
+              padding: const EdgeInsets.all(20),
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(18),
+                  decoration: BoxDecoration(
+                    color: statusColorValue.withValues(alpha: 0.09),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: statusColorValue.withValues(alpha: 0.25),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(statusIcon, color: statusColorValue, size: 38),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              statusTitle,
+                              style: TextStyle(
+                                color: statusColorValue,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 20,
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              tr(
+                                'Prüfung für die Nutzung ohne Internet',
+                                'Check for use without an internet connection',
+                              ),
+                              style: const TextStyle(color: Colors.black54),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (_message.isNotEmpty) ...[
+                  const SizedBox(height: 14),
+                  Text(
+                    _message,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: Color(0xFFB26A00),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 22),
+                _SettingsSection(
+                  title: tr('PRÜFUNG', 'CHECK'),
+                  children: [
+                    _ReadinessRow(
+                      icon: Icons.verified_user_outlined,
+                      title: tr('Offline-Lizenz', 'Offline license'),
+                      ready: _licenseReady,
+                      warning: false,
+                      value: _licenseReady
+                          ? isEnglish
+                                ? '$_offlineDaysRemaining days remaining'
+                                : 'Noch $_offlineDaysRemaining Tage'
+                          : tr('Erneute Prüfung nötig', 'New check required'),
+                      detail: _formatDate(_lastLicenseCheck),
+                    ),
+                    const _SettingsDivider(),
+                    _ReadinessRow(
+                      icon: Icons.inventory_2_outlined,
+                      title: tr('Artikelkatalog', 'Item catalog'),
+                      ready: _catalogReady,
+                      warning: false,
+                      value: _catalogReady
+                          ? isEnglish
+                                ? '${_catalog.length} items'
+                                : '${_catalog.length} Artikel'
+                          : tr('Nicht verfügbar', 'Not available'),
+                      detail: _formatDate(_catalogUpdatedAt),
+                    ),
+                    const _SettingsDivider(),
+                    _ReadinessRow(
+                      icon: Icons.photo_library_outlined,
+                      title: tr('Offline-Bilder', 'Offline images'),
+                      ready: _imagesReady,
+                      warning: !_imagesReady && _imageStatus.imageCount > 0,
+                      value:
+                          '${_imageStatus.imageCount} / $_expectedImageCount',
+                      detail: _formatStorageSize(_imageStatus.totalBytes),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 22),
+                if (_updating) ...[
+                  LinearProgressIndicator(value: progress),
+                  const SizedBox(height: 10),
+                  Text(
+                    _totalImages > 0
+                        ? isEnglish
+                              ? 'Images: $_processedImages of $_totalImages'
+                              : 'Bilder: $_processedImages von $_totalImages'
+                        : tr(
+                            'Lizenz und Katalog werden geprüft…',
+                            'Checking license and catalog…',
+                          ),
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.black54),
+                  ),
+                  const SizedBox(height: 10),
+                  OutlinedButton.icon(
+                    onPressed: _cancellation?.isCancelled == true
+                        ? null
+                        : _cancellation?.cancel,
+                    icon: const Icon(Icons.stop_circle_outlined),
+                    label: Text(tr('Abbrechen', 'Cancel')),
+                  ),
+                ] else
+                  FilledButton.icon(
+                    onPressed: _updateAll,
+                    icon: const Icon(Icons.sync),
+                    label: Text(tr('Jetzt aktualisieren', 'Update now')),
+                  ),
+              ],
+            ),
+    );
+  }
+}
+
+class _ReadinessRow extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String value;
+  final String detail;
+  final bool ready;
+  final bool warning;
+
+  const _ReadinessRow({
+    required this.icon,
+    required this.title,
+    required this.value,
+    required this.detail,
+    required this.ready,
+    required this.warning,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = ready
+        ? const Color(0xFF2E7D32)
+        : warning
+        ? const Color(0xFFB26A00)
+        : const Color(0xFFB3261E);
+    final stateIcon = ready
+        ? Icons.check_circle
+        : warning
+        ? Icons.warning_amber_rounded
+        : Icons.cancel;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: const Color(0xFFF0F0F0),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: const Color(0xFF2C2C2C), size: 22),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  style: TextStyle(
+                    color: color,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
+                ),
+                Text(
+                  detail,
+                  style: const TextStyle(color: Colors.black45, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+          Icon(stateIcon, color: color),
+        ],
+      ),
+    );
+  }
+}
+
+class _OfflineImagesPage extends StatefulWidget {
+  const _OfflineImagesPage();
+
+  @override
+  State<_OfflineImagesPage> createState() => _OfflineImagesPageState();
+}
+
+class _OfflineImagesPageState extends State<_OfflineImagesPage> {
+  List<CatalogItem> _catalog = [];
+  OfflineImageStatus _status = const OfflineImageStatus(
+    imageCount: 0,
+    totalBytes: 0,
+    lastUpdated: null,
+  );
+  OfflineImageSyncCancellation? _cancellation;
+  bool _loading = true;
+  bool _syncing = false;
+  int _processed = 0;
+  int _total = 0;
+  int _available = 0;
+  int _failed = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void dispose() {
+    _cancellation?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    try {
+      final cachedJson = await CatalogCachePrefs.getCatalogJson();
+      final catalog = cachedJson == null || cachedJson.isEmpty
+          ? <CatalogItem>[]
+          : await compute(_parseCatalogItemsInBackground, cachedJson);
+      final status = await OfflineImageStore.getStatus();
+      if (!mounted) return;
+      setState(() {
+        _catalog = catalog;
+        _status = status;
+        _loading = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _synchronize() async {
+    if (_syncing || _catalog.isEmpty) return;
+    final cancellation = OfflineImageSyncCancellation();
+    _cancellation = cancellation;
+
+    setState(() {
+      _syncing = true;
+      _processed = 0;
+      _total = _catalog.where((item) => item.jpgExists).length;
+      _available = 0;
+      _failed = 0;
+    });
+
+    final result = await OfflineImageStore.synchronize(
+      _catalog,
+      cancellation: cancellation,
+      onProgress: (processed, total, available, failed) {
+        if (!mounted) return;
+        setState(() {
+          _processed = processed;
+          _total = total;
+          _available = available;
+          _failed = failed;
+        });
+      },
+    );
+    final status = await OfflineImageStore.getStatus();
+    if (!mounted) return;
+
+    setState(() {
+      _status = status;
+      _syncing = false;
+      _cancellation = null;
+    });
+
+    if (!result.cancelled) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            isEnglish
+                ? '${result.available} images are available offline.'
+                : '${result.available} Bilder sind offline verfügbar.',
+          ),
+        ),
+      );
+    }
+  }
+
+  void _cancelSync() {
+    _cancellation?.cancel();
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _clearImages() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(tr('Offline-Bilder löschen?', 'Delete offline images?')),
+        content: Text(
+          tr(
+            'Alle verkleinerten Bilder werden vom Gerät entfernt. Die Bilder auf dem Server bleiben unverändert.',
+            'All reduced images will be removed from the device. Images on the server remain unchanged.',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(tr('Abbrechen', 'Cancel')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(tr('Löschen', 'Delete')),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    await OfflineImageStore.clear();
+    final status = await OfflineImageStore.getStatus();
+    if (mounted) setState(() => _status = status);
+  }
+
+  String get _lastUpdatedText {
+    final value = _status.lastUpdated;
+    if (value == null) return tr('Noch nie', 'Never');
+    final date = MaterialLocalizations.of(context).formatMediumDate(value);
+    final time = TimeOfDay.fromDateTime(value).format(context);
+    return '$date · $time';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final progress = _total <= 0 ? null : _processed / _total;
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF5F5F5),
+      appBar: AppBar(title: Text(tr('Offline-Bilder', 'Offline images'))),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : ListView(
+              padding: const EdgeInsets.all(20),
+              children: [
+                _SettingsSection(
+                  title: tr('STATUS', 'STATUS'),
+                  children: [
+                    _SettingsTile(
+                      icon: Icons.photo_library_outlined,
+                      title: tr('Gespeicherte Bilder', 'Saved images'),
+                      value: '${_status.imageCount}',
+                    ),
+                    const _SettingsDivider(),
+                    _SettingsTile(
+                      icon: Icons.sd_storage_outlined,
+                      title: tr('Speicherbedarf', 'Storage used'),
+                      value: _formatStorageSize(_status.totalBytes),
+                    ),
+                    const _SettingsDivider(),
+                    _SettingsTile(
+                      icon: Icons.update_outlined,
+                      title: tr('Letzte Aktualisierung', 'Last updated'),
+                      value: _lastUpdatedText,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEAF2FF),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(Icons.info_outline, color: Color(0xFF245B9E)),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          tr(
+                            'Die Offline-Bilder werden auf 60 % verkleinert und geschützt in der App gespeichert. Bei Internetempfang lädt ATool weiterhin das aktuelle Bild direkt vom Server.',
+                            'Offline images are reduced to 60% and stored privately inside the app. When internet access is available, ATool still loads the current image directly from the server.',
+                          ),
+                          style: const TextStyle(height: 1.4),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (_syncing) ...[
+                  const SizedBox(height: 22),
+                  LinearProgressIndicator(value: progress),
+                  const SizedBox(height: 10),
+                  Text(
+                    isEnglish
+                        ? '$_processed of $_total · $_available saved · $_failed failed'
+                        : '$_processed von $_total · $_available gespeichert · $_failed fehlgeschlagen',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.black54),
+                  ),
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    onPressed: _cancellation?.isCancelled == true
+                        ? null
+                        : _cancelSync,
+                    icon: const Icon(Icons.stop_circle_outlined),
+                    label: Text(
+                      _cancellation?.isCancelled == true
+                          ? tr('Wird abgebrochen…', 'Canceling…')
+                          : tr('Abbrechen', 'Cancel'),
+                    ),
+                  ),
+                ] else ...[
+                  const SizedBox(height: 22),
+                  FilledButton.icon(
+                    onPressed: _catalog.isEmpty ? null : _synchronize,
+                    icon: const Icon(Icons.download_outlined),
+                    label: Text(
+                      _status.imageCount == 0
+                          ? tr(
+                              'Offline-Bilder herunterladen',
+                              'Download offline images',
+                            )
+                          : tr(
+                              'Fehlende Bilder ergänzen',
+                              'Download missing images',
+                            ),
+                    ),
+                  ),
+                  if (_status.imageCount > 0) ...[
+                    const SizedBox(height: 8),
+                    TextButton.icon(
+                      onPressed: _clearImages,
+                      icon: const Icon(Icons.delete_outline),
+                      label: Text(
+                        tr('Offline-Bilder löschen', 'Delete offline images'),
+                      ),
+                    ),
+                  ],
+                  if (_catalog.isEmpty) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      tr(
+                        'Der Katalog ist noch nicht verfügbar. Öffne zuerst die Artikelsuche mit einer Internetverbindung.',
+                        'The catalog is not available yet. Open the item search with an internet connection first.',
+                      ),
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: Colors.red),
+                    ),
+                  ],
+                ],
+              ],
+            ),
+    );
+  }
+}
+
+class _DxfSettingsPage extends StatefulWidget {
+  final DxfLayerSettings initialSettings;
+  final _DxfLayerSettingsValidator validate;
+
+  const _DxfSettingsPage({
+    required this.initialSettings,
+    required this.validate,
+  });
+
+  @override
+  State<_DxfSettingsPage> createState() => _DxfSettingsPageState();
+}
+
+class _DxfSettingsPageState extends State<_DxfSettingsPage> {
+  late DxfLayerSettings _settings = widget.initialSettings;
+
+  Future<void> _setEnabled(bool enabled) async {
+    final settings = _settings.copyWith(enabled: enabled);
+    await DxfLayerPrefs.setSettings(settings);
+    if (mounted) setState(() => _settings = settings);
+  }
+
+  Future<void> _edit() async {
+    final settings = await showDialog<DxfLayerSettings>(
+      context: context,
+      builder: (_) => _DxfLayerSettingsDialog(
+        initialSettings: _settings,
+        validate: widget.validate,
+      ),
+    );
+    if (settings == null) return;
+
+    await DxfLayerPrefs.setSettings(settings);
+    if (!mounted) return;
+    setState(() => _settings = settings);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(tr('DXF-Layer gespeichert.', 'DXF layers saved.')),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF5F5F5),
+      appBar: AppBar(title: Text(tr('DXF-Layer', 'DXF layers'))),
+      body: ListView(
+        padding: const EdgeInsets.all(20),
+        children: [
+          _SettingsSection(
+            title: tr('VERARBEITUNG', 'PROCESSING'),
+            children: [
+              SwitchListTile(
+                value: _settings.enabled,
+                onChanged: _setEnabled,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 4,
+                ),
+                secondary: const Icon(Icons.auto_fix_high_outlined),
+                title: Text(
+                  tr(
+                    'Layer automatisch anpassen',
+                    'Adjust layers automatically',
+                  ),
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+                subtitle: Text(
+                  tr(
+                    'Beim Download wird eine angepasste DXF-Datei erzeugt.',
+                    'A customized DXF file is created during download.',
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 22),
+          _SettingsSection(
+            title: tr('EINBAUARTEN', 'INSTALLATION TYPES'),
+            children: const [_DxfInstallationPreview()],
+          ),
+          const SizedBox(height: 22),
+          _SettingsSection(
+            title: tr('LAYERZUORDNUNG', 'LAYER MAPPING'),
+            children: [
+              _SettingsTile(
+                iconWidget: const _DxfCutIcon(_DxfCutIconType.flaechenbuendig),
+                title: tr('Flächenbündig (aussen)', 'Flush-mounted (outside)'),
+                subtitle:
+                    '${_settings.falzLayer} · ${_dxfAciColorName(_settings.falzColor)}',
+              ),
+              const _SettingsDivider(),
+              _SettingsTile(
+                iconWidget: const _DxfCutIcon(_DxfCutIconType.flaechenbuendig),
+                title: tr('Flächenbündig (innen)', 'Flush-mounted (inside)'),
+                subtitle:
+                    '${_settings.gesaegtLayer} · ${_dxfAciColorName(_settings.gesaegtColor)}',
+              ),
+              const _SettingsDivider(),
+              _SettingsTile(
+                iconWidget: const _DxfCutIcon(_DxfCutIconType.auflage),
+                title: tr('Auflage', 'Support'),
+                subtitle:
+                    '${_settings.auflageLayer} · ${_dxfAciColorName(_settings.auflageColor)}',
+              ),
+              const _SettingsDivider(),
+              _SettingsTile(
+                iconWidget: const _DxfCutIcon(_DxfCutIconType.unterbau),
+                title: tr('Unterbau', 'Substructure'),
+                subtitle:
+                    '${_settings.unterbauLayer} · ${_dxfAciColorName(_settings.unterbauColor)}',
+              ),
+              const _SettingsDivider(),
+              _SettingsTile(
+                icon: Icons.radio_button_unchecked,
+                title: tr('Bohrungen', 'Drill holes'),
+                subtitle:
+                    '${_settings.bohrungLayer} · ${_dxfAciColorName(_settings.bohrungColor)}',
+              ),
+              const _SettingsDivider(),
+              _SettingsTile(
+                icon: Icons.architecture_outlined,
+                title: tr('Konstruktion', 'Construction'),
+                subtitle:
+                    '${_settings.konstruktionLayer} · ${_dxfAciColorName(_settings.konstruktionColor)}',
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          FilledButton.icon(
+            onPressed: _edit,
+            icon: const Icon(Icons.edit_outlined),
+            label: Text(tr('Layer bearbeiten', 'Edit layers')),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AccountLicensePage extends StatelessWidget {
+  final Map<String, dynamic>? data;
+  final String deviceUuid;
+  final DeviceMeta? deviceMeta;
+
+  const _AccountLicensePage({
+    required this.data,
+    required this.deviceUuid,
+    required this.deviceMeta,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final firm = data?['firm'] as Map<String, dynamic>?;
+    final user = data?['user'] as Map<String, dynamic>?;
+    final device = data?['device'] as Map<String, dynamic>?;
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF5F5F5),
+      appBar: AppBar(title: Text(tr('Benutzer & Lizenz', 'User & license'))),
+      body: ListView(
+        padding: const EdgeInsets.all(20),
+        children: [
+          _InfoCard(
+            title: tr('Benutzer', 'User'),
+            icon: Icons.person_outline,
+            children: [
+              _InfoRow(
+                label: tr('Name', 'Name'),
+                value: '${user?['name'] ?? ''}',
+              ),
+              _InfoRow(label: 'E-Mail', value: '${user?['email'] ?? ''}'),
+              _InfoRow(
+                label: tr('Rolle', 'Role'),
+                value: '${user?['role'] ?? ''}',
+              ),
+            ],
+          ),
+          _InfoCard(
+            title: tr('Firma & Lizenz', 'Company & license'),
+            icon: Icons.business_outlined,
+            children: [
+              _InfoRow(
+                label: tr('Firma', 'Company'),
+                value: '${firm?['name'] ?? ''}',
+              ),
+              _StatusRow(
+                label: tr('Status', 'Status'),
+                value: '${firm?['status'] ?? ''}',
+              ),
+              _InfoRow(
+                label: tr('Max Geräte', 'Max. devices'),
+                value: '${firm?['max_devices'] ?? ''}',
+              ),
+              _InfoRow(
+                label: tr('Lizenz bis', 'License until'),
+                value: '${firm?['license_end'] ?? ''}',
+              ),
+              _InfoRow(
+                label: tr('Tage übrig', 'Days remaining'),
+                value: '${firm?['days_left'] ?? ''}',
+              ),
+            ],
+          ),
+          _InfoCard(
+            title: tr('Gerät', 'Device'),
+            icon: Icons.devices_outlined,
+            children: [
+              _InfoRow(label: tr('Lokale ID', 'Local ID'), value: deviceUuid),
+              _InfoRow(
+                label: tr('Gerät', 'Device'),
+                value: deviceMeta?.deviceName ?? '',
+              ),
+              _InfoRow(
+                label: tr('Betriebssystem', 'Operating system'),
+                value: deviceMeta?.osVersion ?? '',
+              ),
+              _InfoRow(
+                label: tr('App-Version', 'App version'),
+                value: deviceMeta?.appVersion ?? '',
+              ),
+              _StatusRow(
+                label: tr('Gerätestatus', 'Device status'),
+                value: '${device?['status'] ?? ''}',
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LegalSettingsPage extends StatelessWidget {
+  final VoidCallback onShowUsageInformation;
+  final Future<void> Function() onOpenPrivacyPolicy;
+
+  const _LegalSettingsPage({
+    required this.onShowUsageInformation,
+    required this.onOpenPrivacyPolicy,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF5F5F5),
+      appBar: AppBar(
+        title: Text(tr('Datenschutz & Nutzung', 'Privacy & usage')),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(20),
+        children: [
+          Text(
+            tr(
+              'Hier findest du Hinweise zur Nutzung von ATool und die aktuelle Datenschutzerklärung.',
+              'Find information about using ATool and the current privacy policy here.',
+            ),
+            style: const TextStyle(color: Colors.black54, height: 1.45),
+          ),
+          const SizedBox(height: 20),
+          _SettingsSection(
+            title: tr('INFORMATIONEN', 'INFORMATION'),
+            children: [
+              _SettingsTile(
+                icon: Icons.description_outlined,
+                title: tr('Hinweise zur Nutzung', 'Usage information'),
+                subtitle: tr(
+                  'Datenqualität, OCR und betriebliche Nutzung',
+                  'Data quality, OCR, and business use',
+                ),
+                onTap: onShowUsageInformation,
+              ),
+              const _SettingsDivider(),
+              _SettingsTile(
+                icon: Icons.privacy_tip_outlined,
+                title: tr('Datenschutzerklärung', 'Privacy policy'),
+                subtitle: tr(
+                  'Öffnet die aktuelle Version im Browser',
+                  'Opens the current version in your browser',
+                ),
+                onTap: () => unawaited(onOpenPrivacyPolicy()),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class AppHelpPage extends StatelessWidget {
+  const AppHelpPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF5F5F5),
+      appBar: AppBar(title: Text(tr('ATool Hilfe', 'ATool help'))),
+      body: ListView(
+        padding: const EdgeInsets.all(20),
+        children: [
+          Text(
+            tr('Die App-Oberfläche erklärt', 'Understanding the app'),
+            style: Theme.of(
+              context,
+            ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            tr(
+              'ATool hilft dir, Artikelnummern auf Etiketten zu erkennen, passende Ausschnitte zu finden und die zugehörigen Dateien zu öffnen oder herunterzuladen.',
+              'ATool helps you recognize item numbers on labels, find matching cut-outs, and open or download the related files.',
+            ),
+            style: const TextStyle(
+              color: Colors.black54,
+              fontSize: 15,
+              height: 1.45,
+            ),
+          ),
+          const SizedBox(height: 20),
+          _HelpSection(
+            icon: Icons.search,
+            title: tr('Artikelnummer suchen', 'Search for an item number'),
+            text: tr(
+              'Gib oben mindestens vier Zeichen der Artikelnummer ein. Die Treffer erscheinen automatisch. Mit der Suchtaste der Tastatur kannst du die Suche ebenfalls direkt starten.',
+              'Enter at least four characters of the item number at the top. Results appear automatically. You can also start the search with the keyboard search button.',
+            ),
+          ),
+          _HelpSection(
+            icon: Icons.camera_alt_outlined,
+            title: tr('Etikett mit OCR erfassen', 'Scan a label with OCR'),
+            text: tr(
+              'Tippe auf das Kamera-Symbol und fotografiere das Etikett möglichst gerade und bildfüllend. Alternativ kannst du ein vorhandenes Bild aus der Galerie wählen.',
+              'Tap the camera icon and photograph the label as straight and full-frame as possible. You can also select an existing image from the gallery.',
+            ),
+          ),
+          _HelpSection(
+            icon: Icons.stop_circle_outlined,
+            title: tr(
+              'OCR abbrechen oder korrigieren',
+              'Cancel or correct OCR',
+            ),
+            text: tr(
+              'Mit „OCR abbrechen“ stoppst du die automatische Suche sofort. Danach kannst du die Artikelnummer selbst eingeben oder einen bereits erkannten OCR-Begriff antippen.',
+              'Use “Cancel OCR” to stop the automatic search immediately. You can then enter the item number yourself or tap an OCR term that has already been recognized.',
+            ),
+          ),
+          _HelpSection(
+            icon: Icons.list_alt_outlined,
+            title: tr('Treffer verstehen', 'Understanding results'),
+            text: tr(
+              'Ein grüner Hinweis bedeutet, dass ATool passende Artikel gefunden hat. In jeder Trefferkarte siehst du Hersteller, Typ und Dateiname.',
+              'A green message means that ATool found matching items. Each result card shows the manufacturer, type, and file name.',
+            ),
+          ),
+          _HelpSection(
+            icon: Icons.visibility_outlined,
+            title: tr('Ansehen', 'View'),
+            text: tr(
+              'Öffnet die Vorschau des Ausschnitts. Mit Doppeltippen oder zwei Fingern kannst du das Bild vergrößern.',
+              'Opens a preview of the cut-out. Double-tap or use two fingers to zoom the image.',
+            ),
+          ),
+          _HelpSection(
+            icon: Icons.download_outlined,
+            title: tr('Download und PDF-Suche', 'Download and PDF search'),
+            text: tr(
+              '„Download“ teilt oder speichert die DXF-Datei. „PDF suchen“ öffnet eine Websuche nach passenden technischen Unterlagen.',
+              '“Download” shares or saves the DXF file. “Search PDF” opens a web search for matching technical documents.',
+            ),
+          ),
+          _HelpSection(
+            icon: Icons.settings_outlined,
+            title: tr('Einstellungen', 'Settings'),
+            text: tr(
+              'Über das Zahnrad änderst du Sprache, Download-Ziel und DXF-Layer. Im Bereich „Info & Lizenz“ findest du Geräte-, Firmen- und Lizenzinformationen.',
+              'Use the gear icon to change the language, download destination, and DXF layers. “Info & license” contains device, company, and license details.',
+            ),
+          ),
+          const SizedBox(height: 8),
+          FilledButton.icon(
+            onPressed: () => Navigator.of(context).pop(),
+            icon: const Icon(Icons.check),
+            label: Text(tr('Verstanden', 'Got it')),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HelpSection extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String text;
+
+  const _HelpSection({
+    required this.icon,
+    required this.title,
+    required this.text,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: const Color(0xFF2C2C2C),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: Colors.white),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    text,
+                    style: const TextStyle(color: Colors.black87, height: 1.4),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class ImageViewerPage extends StatefulWidget {
   final String imageUrl;
   final String filename;
+  final String? localImagePath;
 
   const ImageViewerPage({
     super.key,
     required this.imageUrl,
     required this.filename,
+    this.localImagePath,
   });
 
   @override
@@ -6089,21 +9427,47 @@ class _ImageViewerPageState extends State<ImageViewerPage> {
             child: Image.network(
               widget.imageUrl,
               fit: BoxFit.contain,
-              errorBuilder: (_, __, ___) => const Padding(
-                padding: EdgeInsets.all(24),
-                child: Text(
-                  'Vorschaubild konnte nicht geladen werden.',
-                  style: TextStyle(color: Colors.red),
-                  textAlign: TextAlign.center,
-                ),
-              ),
+              errorBuilder: (_, __, ___) {
+                final localPath = widget.localImagePath;
+                if (localPath != null && localPath.isNotEmpty) {
+                  return Image.file(
+                    File(localPath),
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) => _imageError(),
+                  );
+                }
+                return _imageError();
+              },
               loadingBuilder: (context, child, progress) {
                 if (progress == null) return child;
+                final localPath = widget.localImagePath;
+                if (localPath != null && localPath.isNotEmpty) {
+                  return Image.file(
+                    File(localPath),
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) =>
+                        const Center(child: CircularProgressIndicator()),
+                  );
+                }
                 return const Center(child: CircularProgressIndicator());
               },
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _imageError() {
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Text(
+        tr(
+          'Vorschaubild konnte nicht geladen werden.',
+          'Could not load the preview image.',
+        ),
+        style: const TextStyle(color: Colors.red),
+        textAlign: TextAlign.center,
       ),
     );
   }
@@ -6260,7 +9624,7 @@ class _DxfLayerSettingsDialogState extends State<_DxfLayerSettingsDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('DXF-Layer'),
+      title: Text(tr('DXF-Layer', 'DXF layers')),
       content: SizedBox(
         width: 460,
         child: SingleChildScrollView(
@@ -6268,7 +9632,7 @@ class _DxfLayerSettingsDialogState extends State<_DxfLayerSettingsDialog> {
             mainAxisSize: MainAxisSize.min,
             children: [
               _inputRow(
-                label: 'AUSSCHNITT Falz',
+                label: tr('AUSSCHNITT Falz', 'CUT-OUT rebate'),
                 layerController: _falzController,
                 selectedColor: _falzColor,
                 onColorSelected: (color) => setState(() {
@@ -6277,7 +9641,7 @@ class _DxfLayerSettingsDialogState extends State<_DxfLayerSettingsDialog> {
               ),
               const SizedBox(height: 12),
               _inputRow(
-                label: 'AUSSCHNITT gesägt',
+                label: tr('AUSSCHNITT gesägt', 'CUT-OUT saw cut'),
                 layerController: _gesaegtController,
                 selectedColor: _gesaegtColor,
                 onColorSelected: (color) => setState(() {
@@ -6286,7 +9650,7 @@ class _DxfLayerSettingsDialogState extends State<_DxfLayerSettingsDialog> {
               ),
               const SizedBox(height: 12),
               _inputRow(
-                label: 'Auflage',
+                label: tr('Auflage', 'Support'),
                 layerController: _auflageController,
                 selectedColor: _auflageColor,
                 onColorSelected: (color) => setState(() {
@@ -6295,7 +9659,7 @@ class _DxfLayerSettingsDialogState extends State<_DxfLayerSettingsDialog> {
               ),
               const SizedBox(height: 12),
               _inputRow(
-                label: 'Unterbau',
+                label: tr('Unterbau', 'Substructure'),
                 layerController: _unterbauController,
                 selectedColor: _unterbauColor,
                 onColorSelected: (color) => setState(() {
@@ -6304,7 +9668,7 @@ class _DxfLayerSettingsDialogState extends State<_DxfLayerSettingsDialog> {
               ),
               const SizedBox(height: 12),
               _inputRow(
-                label: 'Bohrungen',
+                label: tr('Bohrungen', 'Drill holes'),
                 layerController: _bohrungController,
                 selectedColor: _bohrungColor,
                 onColorSelected: (color) => setState(() {
@@ -6313,7 +9677,7 @@ class _DxfLayerSettingsDialogState extends State<_DxfLayerSettingsDialog> {
               ),
               const SizedBox(height: 12),
               _inputRow(
-                label: 'Konstruktion',
+                label: tr('Konstruktion', 'Construction'),
                 layerController: _konstruktionController,
                 selectedColor: _konstruktionColor,
                 onColorSelected: (color) => setState(() {
@@ -6337,9 +9701,9 @@ class _DxfLayerSettingsDialogState extends State<_DxfLayerSettingsDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Abbrechen'),
+          child: Text(tr('Abbrechen', 'Cancel')),
         ),
-        ElevatedButton(onPressed: _save, child: const Text('Speichern')),
+        ElevatedButton(onPressed: _save, child: Text(tr('Speichern', 'Save'))),
       ],
     );
   }
@@ -6482,7 +9846,7 @@ class _DxfColorPickerDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Farbe wählen'),
+      title: Text(tr('Farbe wählen', 'Select color')),
       content: SizedBox(
         width: 380,
         child: GridView.builder(
@@ -6498,7 +9862,7 @@ class _DxfColorPickerDialog extends StatelessWidget {
             final option = _dxfAciColorOptions[index];
             final selected = option.aci == selectedColor;
             return Tooltip(
-              message: option.name,
+              message: _localizedDxfColorName(option.name),
               child: InkWell(
                 onTap: () => Navigator.of(context).pop(option.aci),
                 borderRadius: BorderRadius.circular(8),
@@ -6522,7 +9886,7 @@ class _DxfColorPickerDialog extends StatelessWidget {
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(
-                      option.name,
+                      _localizedDxfColorName(option.name),
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: _dxfReadableLabelColor(option.color),
@@ -6540,7 +9904,7 @@ class _DxfColorPickerDialog extends StatelessWidget {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Abbrechen'),
+          child: Text(tr('Abbrechen', 'Cancel')),
         ),
       ],
     );
@@ -6576,10 +9940,27 @@ const List<_DxfAciColorOption> _dxfAciColorOptions = [
 
 String _dxfAciColorName(int aci) {
   for (final option in _dxfAciColorOptions) {
-    if (option.aci == aci) return option.name;
+    if (option.aci == aci) return _localizedDxfColorName(option.name);
   }
 
-  return 'Farbe';
+  return tr('Farbe', 'Color');
+}
+
+String _localizedDxfColorName(String name) {
+  if (!isEnglish) return name;
+
+  return switch (name) {
+    'Rot' => 'Red',
+    'Gelb' => 'Yellow',
+    'Grün' => 'Green',
+    'Blau' => 'Blue',
+    'Weiß' => 'White',
+    'Grau' => 'Gray',
+    'Hellgrau' => 'Light gray',
+    'Violett' => 'Violet',
+    'Braun' => 'Brown',
+    _ => name,
+  };
 }
 
 Color _dxfAciFlutterColor(int aci) {
@@ -6616,9 +9997,12 @@ class _InfoCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      elevation: 3,
+      elevation: 0,
       margin: const EdgeInsets.only(bottom: 16),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: Color(0xFFE4E4E4)),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(18),
         child: Column(

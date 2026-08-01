@@ -1,0 +1,3907 @@
+[
+  {
+    "catalog": "135.0747.298",
+    "material_text": "KNG PRO 210-53 3 1/2\" DRKV OT HO MBC ZUB",
+    "label": "135.0747.183"
+  },
+  {
+    "catalog": "135.0747.297",
+    "material_text": "KNG PRO 210-53 3 1/2\"A DRKV OT MBC ZUB",
+    "label": "135.0747.182"
+  },
+  {
+    "catalog": "135.0747.294",
+    "material_text": "KNG Pro210-53 3 1/2\"DRKV OT VUEL OS ZUB",
+    "label": "135.0747.199"
+  },
+  {
+    "catalog": "135.0747.293",
+    "material_text": "KNG Pro210-53 3 1/2\"DRKV OT VUEL SG ZUB",
+    "label": "135.0747.198"
+  },
+  {
+    "catalog": "135.0747.292",
+    "material_text": "KNG Pro210-53 3 1/2\"DRKV OT VUEL ON ZUB",
+    "label": "135.0747.197"
+  },
+  {
+    "catalog": "135.0747.291",
+    "material_text": "KNG Pro210-53 3 1/2\"DRKV OT VUEL MB ZUB",
+    "label": "135.0747.183"
+  },
+  {
+    "catalog": "135.0747.290",
+    "material_text": "KNG Pro210-53A 3 1/2\"DRKV OT VUEL OS ZUB",
+    "label": "135.0747.195"
+  },
+  {
+    "catalog": "135.0747.289",
+    "material_text": "KNG Pro210-53A 3 1/2\"DRKV OT VUEL SG ZUB",
+    "label": "135.0747.194"
+  },
+  {
+    "catalog": "135.0747.288",
+    "material_text": "KNG Pro210-53A 3 1/2\"DRKV OT VUEL ON ZUB",
+    "label": "135.0747.193"
+  },
+  {
+    "catalog": "135.0747.287",
+    "material_text": "KNG Pro210-53A3 1/2\" DRKV OT VUEL MB ZUB",
+    "label": "135.0747.182"
+  },
+  {
+    "catalog": "135.0729.533",
+    "material_text": "UBG 211-78 3 1/2'' EXC MB REV 15DGR MBC",
+    "label": "135.0727.432"
+  },
+  {
+    "catalog": "135.0729.532",
+    "material_text": "UBG 211-86 3 1/2'' EXC MB REV 15DGR MBC",
+    "label": "135.0727.450"
+  },
+  {
+    "catalog": "135.0729.531",
+    "material_text": "UBG 211-100 3 1/2'' EXC REV 15DGR MBC",
+    "label": "135.0727.466"
+  },
+  {
+    "catalog": "135.0729.530",
+    "material_text": "UBG 251-100 3 1/2'' EXC REV 15DGR MBC",
+    "label": "135.0727.472"
+  },
+  {
+    "catalog": "135.0729.528",
+    "material_text": "CNG 251-100 3 1/2'' EXC REV MRU 15DGR OS",
+    "label": "135.0727.549"
+  },
+  {
+    "catalog": "135.0729.527",
+    "material_text": "CNG 251-100 3 1/2'' EXC REV MRU 15DGR SG",
+    "label": "135.0727.548"
+  },
+  {
+    "catalog": "135.0729.526",
+    "material_text": "CNG 251-100 3 1/2'' EXC REV MRU 15DGR ON",
+    "label": "135.0727.546"
+  },
+  {
+    "catalog": "135.0729.525",
+    "material_text": "CNG 251-100 3 1/2'' EXC REV MRU 15DGR MB",
+    "label": "135.0727.545"
+  },
+  {
+    "catalog": "135.0729.524",
+    "material_text": "CNG 211-100 3 1/2'' EXC REV MRU 15DGR OS",
+    "label": "135.0727.543"
+  },
+  {
+    "catalog": "135.0729.523",
+    "material_text": "CNG 211-100 3 1/2'' EXC REV MRU 15DGR SG",
+    "label": "135.0727.542"
+  },
+  {
+    "catalog": "135.0729.522",
+    "material_text": "CNG 211-100 3 1/2'' EXC REV MRU 15DGR ON",
+    "label": "135.0727.540"
+  },
+  {
+    "catalog": "135.0729.521",
+    "material_text": "CNG 211-100 3 1/2'' EXC REV MRU 15DGR MB",
+    "label": "135.0727.539"
+  },
+  {
+    "catalog": "135.0729.520",
+    "material_text": "CNG 211-86 3 1/2'' EXC REV MRU 15DGR OS",
+    "label": "135.0727.537"
+  },
+  {
+    "catalog": "135.0729.519",
+    "material_text": "CNG 211-86 3 1/2'' EXC REV MRU 15DGR SG",
+    "label": "135.0727.536"
+  },
+  {
+    "catalog": "135.0729.518",
+    "material_text": "CNG 211-86 3 1/2'' EXC REV MRU 15DGR ON",
+    "label": "135.0727.534"
+  },
+  {
+    "catalog": "135.0729.517",
+    "material_text": "CNG 211-86 3 1/2'' EXC REV MRU 15DGR MB",
+    "label": "135.0727.533"
+  },
+  {
+    "catalog": "135.0729.516",
+    "material_text": "CNG 211-78 3 1/2'' EXC REV MRU 15DGR OS",
+    "label": "135.0727.531"
+  },
+  {
+    "catalog": "135.0729.515",
+    "material_text": "CNG 211-78 3 1/2'' EXC REV MRU 15DGR SG",
+    "label": "135.0727.530"
+  },
+  {
+    "catalog": "135.0729.514",
+    "material_text": "CNG 211-78 3 1/2'' EXC REV MRU 15DGR ON",
+    "label": "135.0727.528"
+  },
+  {
+    "catalog": "135.0729.513",
+    "material_text": "CNG 211-78 3 1/2'' EXC REV MRU 15DGR MB",
+    "label": "135.0727.525"
+  },
+  {
+    "catalog": "135.0729.512",
+    "material_text": "UBG 251-100 3 1/2'' EXC REV MRU 15DGR OS",
+    "label": "135.0727.479"
+  },
+  {
+    "catalog": "135.0729.511",
+    "material_text": "UBG 251-100 3 1/2'' EXC REV MRU 15DGR SG",
+    "label": "135.0727.476"
+  },
+  {
+    "catalog": "135.0729.510",
+    "material_text": "UBG 251-100 3 1/2'' EXC REV MRU 15DGR ON",
+    "label": "135.0727.473"
+  },
+  {
+    "catalog": "135.0729.509",
+    "material_text": "UBG 251-100 3 1/2'' EXC REV MRU 15DGR MB",
+    "label": "135.0727.472"
+  },
+  {
+    "catalog": "135.0729.508",
+    "material_text": "UBG 211-100 3 1/2'' EXC REV MRU 15DGR OS",
+    "label": "135.0727.470"
+  },
+  {
+    "catalog": "135.0729.507",
+    "material_text": "UBG 211-100 3 1/2'' EXC REV MRU 15DGR SG",
+    "label": "135.0727.469"
+  },
+  {
+    "catalog": "135.0729.506",
+    "material_text": "UBG 211-100 3 1/2'' EXC REV MRU 15DGR ON",
+    "label": "135.0727.467"
+  },
+  {
+    "catalog": "135.0729.505",
+    "material_text": "UBG 211-100 3 1/2' EXC REV MRU 15DGR MB",
+    "label": "135.0727.466"
+  },
+  {
+    "catalog": "135.0729.504",
+    "material_text": "UBG 211-86 3 1/2'' EXC REV MRU 15DGR OS",
+    "label": "135.0727.464"
+  },
+  {
+    "catalog": "135.0729.503",
+    "material_text": "UBG 211-86 3 1/2'' EXC REV MRU 15DGR SG",
+    "label": "135.0727.463"
+  },
+  {
+    "catalog": "135.0729.502",
+    "material_text": "UBG 211-86 3 1/2'' EXC REV MRU 15DGR ON",
+    "label": "135.0727.461"
+  },
+  {
+    "catalog": "135.0729.500",
+    "material_text": "UBG 211-86 3 1/2'' EXC REV MRU 15DGR MB",
+    "label": "135.0727.450"
+  },
+  {
+    "catalog": "135.0729.499",
+    "material_text": "UBG 211-78 3 1/2'' EXC REV MRU 15DGR OS",
+    "label": "135.0727.448"
+  },
+  {
+    "catalog": "135.0729.498",
+    "material_text": "UBG 211-78 3 1/2'' EXC REV MRU 15DGR SG",
+    "label": "135.0727.447"
+  },
+  {
+    "catalog": "135.0729.497",
+    "material_text": "UBG 211-78 3 1/2'' EXC REV MRU 15DGR ON",
+    "label": "135.0727.434"
+  },
+  {
+    "catalog": "135.0729.495",
+    "material_text": "UBG 211-78 3 1/2'' EXC REV MRU 15DGR MB",
+    "label": "135.0727.432"
+  },
+  {
+    "catalog": "135.0723.974",
+    "material_text": "FSG 211-86 3 1/2\" DRKV MUE REV SG",
+    "label": "135.0706.701"
+  },
+  {
+    "catalog": "135.0715.510",
+    "material_text": "MRG 210-37 A 3 1/2\" SV OT 3BL VUEL SG",
+    "label": "135.0706.717"
+  },
+  {
+    "catalog": "135.0715.509",
+    "material_text": "MRG 210-37 A 3 1/2\" DRKV OT 3BL VUEL SG",
+    "label": "135.0706.717"
+  },
+  {
+    "catalog": "135.0715.508",
+    "material_text": "MRG 210-52 A 3 1/2\" SV OT 3BL VUEL SG",
+    "label": "135.0706.719"
+  },
+  {
+    "catalog": "135.0715.507",
+    "material_text": "MRG 210-52 A 3 1/2\" DRKV OT 3BL VUEL SG",
+    "label": "135.0706.719"
+  },
+  {
+    "catalog": "135.0715.506",
+    "material_text": "MRG 210-72 A 3 1/2\" SV OT 5BL VUEL SG",
+    "label": "135.0706.732"
+  },
+  {
+    "catalog": "135.0715.505",
+    "material_text": "MRG 210-72 A 3 1/2\" DRKV OT 5BL VUEL SG",
+    "label": "135.0706.732"
+  },
+  {
+    "catalog": "135.0715.504",
+    "material_text": "MRG 210-37 3 1/2\" SV OT OBL VUEL SG",
+    "label": "135.0706.716"
+  },
+  {
+    "catalog": "135.0715.503",
+    "material_text": "MRG 210-37 3 1/2\" DRKV OT OBL VUEL SG",
+    "label": "135.0706.716"
+  },
+  {
+    "catalog": "135.0715.502",
+    "material_text": "MRG 210-52 3 1/2\" SV OT OBL VUEL SG",
+    "label": "135.0706.718"
+  },
+  {
+    "catalog": "135.0715.501",
+    "material_text": "MRG 210-52 3 1/2\" DRKV OT OBL VUEL SG",
+    "label": "135.0706.718"
+  },
+  {
+    "catalog": "135.0715.500",
+    "material_text": "MRG 210-72 3 1/2\" SV OT OBL VUEL SG",
+    "label": "135.0706.731"
+  },
+  {
+    "catalog": "135.0715.499",
+    "material_text": "MRG 210-72 3 1/2\" DRKV OT OBL VUEL SG",
+    "label": "135.0706.731"
+  },
+  {
+    "catalog": "135.0683.055",
+    "material_text": "MRG 210-72 A 3 1/2\" EXC OT 5BL VUEL MBC",
+    "label": "135.0680.635"
+  },
+  {
+    "catalog": "135.0683.054",
+    "material_text": "MRG 210-52 A 3 1/2\" EXC OT 3BL VUEL MBC",
+    "label": "135.0680.631"
+  },
+  {
+    "catalog": "135.0683.053",
+    "material_text": "MRG 210-37 A 3 1/2\" EXC OT 3BL VUEL MBC",
+    "label": "135.0680.627"
+  },
+  {
+    "catalog": "135.0683.052",
+    "material_text": "MRG 210-72 3 1/2\" EXC OT OBL VUEL MBC",
+    "label": "135.0680.623"
+  },
+  {
+    "catalog": "135.0683.051",
+    "material_text": "MRG 210-52 3 1/2\" EXC OT OBL VUEL MBC",
+    "label": "135.0680.615"
+  },
+  {
+    "catalog": "135.0683.050",
+    "material_text": "MRG 210-37 3 1/2\" EXC OT OBL VUEL MBC",
+    "label": "135.0680.611"
+  },
+  {
+    "catalog": "135.0683.049",
+    "material_text": "MRG 210-72 A 3 1/2\" SV OT 5BL VUEL MBC",
+    "label": "135.0680.635"
+  },
+  {
+    "catalog": "135.0683.048",
+    "material_text": "MRG 210-52 A 3 1/2\" SV OT 3BL VUEL MBC",
+    "label": "135.0680.631"
+  },
+  {
+    "catalog": "135.0683.047",
+    "material_text": "MRG 210-37 A 3 1/2\" SV OT 3BL VUEL MBC",
+    "label": "135.0680.627"
+  },
+  {
+    "catalog": "135.0683.046",
+    "material_text": "MRG 210-72 3 1/2\" SV OT OBL VUEL MBC",
+    "label": "135.0680.623"
+  },
+  {
+    "catalog": "135.0683.045",
+    "material_text": "MRG 210-52 3 1/2\" SV OT OBL VUEL MBC",
+    "label": "135.0680.615"
+  },
+  {
+    "catalog": "135.0683.044",
+    "material_text": "MRG 210-37 3 1/2\" SV OT OBL VUEL MBC",
+    "label": "135.0680.611"
+  },
+  {
+    "catalog": "135.0683.043",
+    "material_text": "MRG 210-72 A 3 1/2\" SV OT 5BL VUEL MB",
+    "label": "135.0680.635"
+  },
+  {
+    "catalog": "135.0683.042",
+    "material_text": "MRG 210-72 A 3 1/2\" SV OT 5BL VUEL OS",
+    "label": "135.0680.634"
+  },
+  {
+    "catalog": "135.0683.041",
+    "material_text": "MRG 210-72 A 3 1/2\" SV OT 5BL VUEL PW",
+    "label": "135.0680.633"
+  },
+  {
+    "catalog": "135.0683.040",
+    "material_text": "MRG 210-72 A 3 1/2\" SV OT 5BL VUEL ST",
+    "label": "135.0680.632"
+  },
+  {
+    "catalog": "135.0683.039",
+    "material_text": "MRG 210-72 A 3 1/2\" SV OT 5BL VUEL ON",
+    "label": "135.0680.594"
+  },
+  {
+    "catalog": "135.0683.038",
+    "material_text": "MRG 210-52 A 3 1/2\" SV OT 3BL VUEL MB",
+    "label": "135.0680.631"
+  },
+  {
+    "catalog": "135.0683.037",
+    "material_text": "MRG 210-52 A 3 1/2\" SV OT 3BL VUEL OS",
+    "label": "135.0680.630"
+  },
+  {
+    "catalog": "135.0683.036",
+    "material_text": "MRG 210-52 A 3 1/2\" SV OT 3BL VUEL PW",
+    "label": "135.0680.629"
+  },
+  {
+    "catalog": "135.0683.035",
+    "material_text": "MRG 210-52 A 3 1/2\" SV OT 3BL VUEL ST",
+    "label": "135.0680.628"
+  },
+  {
+    "catalog": "135.0683.034",
+    "material_text": "MRG 210-52 A 3 1/2\" SV OT 3BL VUEL ON",
+    "label": "135.0680.593"
+  },
+  {
+    "catalog": "135.0683.033",
+    "material_text": "MRG 210-37 A 3 1/2\" SV OT 3BL VUEL MB",
+    "label": "135.0680.627"
+  },
+  {
+    "catalog": "135.0683.031",
+    "material_text": "MRG 210-37 A 3 1/2\" SV OT 3BL VUEL OS",
+    "label": "135.0680.626"
+  },
+  {
+    "catalog": "135.0683.030",
+    "material_text": "MRG 210-37 A 3 1/2\" SV OT 3BL VUEL PW",
+    "label": "135.0680.625"
+  },
+  {
+    "catalog": "135.0683.029",
+    "material_text": "MRG 210-37 A 3 1/2\" SV OT 3BL VUEL ST",
+    "label": "135.0680.624"
+  },
+  {
+    "catalog": "135.0683.028",
+    "material_text": "MRG 210-37 A 3 1/2\" SV OT 3BL VUEL ON",
+    "label": "135.0680.592"
+  },
+  {
+    "catalog": "135.0683.027",
+    "material_text": "MRG 210-72 3 1/2\" SV OT OBL VUEL MB",
+    "label": "135.0680.623"
+  },
+  {
+    "catalog": "135.0683.026",
+    "material_text": "MRG 210-72 3 1/2\" SV OT OBL VUEL OS",
+    "label": "135.0680.622"
+  },
+  {
+    "catalog": "135.0683.025",
+    "material_text": "MRG 210-72 3 1/2\" SV OT OBL VUEL PW",
+    "label": "135.0680.621"
+  },
+  {
+    "catalog": "135.0683.024",
+    "material_text": "MRG 210-72 3 1/2\" SV OT OBL VUEL ST",
+    "label": "135.0680.620"
+  },
+  {
+    "catalog": "135.0683.023",
+    "material_text": "MRG 210-72 3 1/2\" SV OT OBL VUEL ON",
+    "label": "135.0680.591"
+  },
+  {
+    "catalog": "135.0683.022",
+    "material_text": "MRG 210-52 3 1/2\" SV OT OBL VUEL MB",
+    "label": "135.0680.615"
+  },
+  {
+    "catalog": "135.0683.021",
+    "material_text": "MRG 210-52 3 1/2\" SV OT OBL VUEL OS",
+    "label": "135.0680.614"
+  },
+  {
+    "catalog": "135.0682.990",
+    "material_text": "MRG 210-52 3 1/2\" SV OT OBL VUEL PW",
+    "label": "135.0680.613"
+  },
+  {
+    "catalog": "135.0682.989",
+    "material_text": "MRG 210-52 3 1/2\" SV OT OBL VUEL ST",
+    "label": "135.0680.612"
+  },
+  {
+    "catalog": "135.0682.988",
+    "material_text": "MRG 210-52 3 1/2\" SV OT OBL VUEL ON",
+    "label": "135.0680.589"
+  },
+  {
+    "catalog": "135.0682.986",
+    "material_text": "MRG 210-37 3 1/2\" SV OT OBL VUEL MB",
+    "label": "135.0680.611"
+  },
+  {
+    "catalog": "135.0682.985",
+    "material_text": "MRG 210-37 3 1/2\" SV OT OBL VUEL OS",
+    "label": "135.0680.600"
+  },
+  {
+    "catalog": "135.0682.984",
+    "material_text": "MRG 210-37 3 1/2\" SV OT OBL VUEL PW",
+    "label": "135.0680.599"
+  },
+  {
+    "catalog": "135.0682.983",
+    "material_text": "MRG 210-37 3 1/2\" SV OT OBL VUEL ST",
+    "label": "135.0680.598"
+  },
+  {
+    "catalog": "135.0682.982",
+    "material_text": "MRG 210-37 3 1/2\" SV OT OBL VUEL ON",
+    "label": "135.0680.588"
+  },
+  {
+    "catalog": "135.0682.969",
+    "material_text": "MRG 210-72 A 3 1/2\" DRKV OT 5BL VUEL MB",
+    "label": "135.0680.635"
+  },
+  {
+    "catalog": "135.0682.968",
+    "material_text": "MRG 210-72 A 3 1/2\" DRKV OT 5BL VUEL OS",
+    "label": "135.0680.634"
+  },
+  {
+    "catalog": "135.0682.967",
+    "material_text": "MRG 210-72 A 3 1/2\" DRKV OT 5BL VUEL PW",
+    "label": "135.0680.633"
+  },
+  {
+    "catalog": "135.0682.966",
+    "material_text": "MRG 210-72 A 3 1/2\" DRKV OT 5BL VUEL ST",
+    "label": "135.0680.632"
+  },
+  {
+    "catalog": "135.0682.965",
+    "material_text": "MRG 210-72 A 3 1/2\" DRKV OT 5BL VUEL ON",
+    "label": "135.0680.594"
+  },
+  {
+    "catalog": "135.0682.964",
+    "material_text": "MRG 210-52 A 3 1/2\" DRKV OT 3BL VUEL MB",
+    "label": "135.0680.631"
+  },
+  {
+    "catalog": "135.0682.963",
+    "material_text": "MRG 210-52 A 3 1/2\" DRKV OT 3BL VUEL OS",
+    "label": "135.0680.630"
+  },
+  {
+    "catalog": "135.0682.962",
+    "material_text": "MRG 210-52 A 3 1/2\" DRKV OT 3BL VUEL PW",
+    "label": "135.0680.629"
+  },
+  {
+    "catalog": "135.0682.961",
+    "material_text": "MRG 210-52 A 3 1/2\" DRKV OT 3BL VUEL ST",
+    "label": "135.0680.628"
+  },
+  {
+    "catalog": "135.0682.890",
+    "material_text": "MRG 210-52 A 3 1/2\" DRKV OT 3BL VUEL ON",
+    "label": "135.0680.593"
+  },
+  {
+    "catalog": "135.0682.833",
+    "material_text": "MRG 210-37 A 3 1/2\" DRKV OT 3BL VUEL MB",
+    "label": "135.0680.627"
+  },
+  {
+    "catalog": "135.0682.832",
+    "material_text": "MRG 210-37 A 3 1/2\" DRKV OT 3BL VUEL OS",
+    "label": "135.0680.626"
+  },
+  {
+    "catalog": "135.0682.831",
+    "material_text": "MRG 210-37 A 3 1/2\" DRKV OT 3BL VUEL PW",
+    "label": "135.0680.625"
+  },
+  {
+    "catalog": "135.0682.830",
+    "material_text": "MRG 210-37 A 3 1/2\" DRKV OT 3BL VUEL ST",
+    "label": "135.0680.624"
+  },
+  {
+    "catalog": "135.0682.829",
+    "material_text": "MRG 210-37 A 3 1/2\" DRKV OT 3BL VUEL ON",
+    "label": "135.0680.592"
+  },
+  {
+    "catalog": "135.0682.827",
+    "material_text": "MRG 210-72 3 1/2\" DRKV OT OBL VUEL MB",
+    "label": "135.0680.623"
+  },
+  {
+    "catalog": "135.0682.826",
+    "material_text": "MRG 210-72 3 1/2\" DRKV OT OBL VUEL OS",
+    "label": "135.0680.622"
+  },
+  {
+    "catalog": "135.0682.825",
+    "material_text": "MRG 210-72 3 1/2\" DRKV OT OBL VUEL PW",
+    "label": "135.0680.621"
+  },
+  {
+    "catalog": "135.0682.824",
+    "material_text": "MRG 210-72 3 1/2\" DRKV OT OBL VUEL ST",
+    "label": "135.0680.620"
+  },
+  {
+    "catalog": "135.0682.823",
+    "material_text": "MRG 210-72 3 1/2\" DRKV OT OBL VUEL ON",
+    "label": "135.0680.591"
+  },
+  {
+    "catalog": "135.0682.812",
+    "material_text": "MRG 210-52 3 1/2\" DRKV OT OBL VUEL MB",
+    "label": "135.0680.615"
+  },
+  {
+    "catalog": "135.0682.811",
+    "material_text": "MRG 210-52 3 1/2\" DRKV OT OBL VUEL OS",
+    "label": "135.0680.614"
+  },
+  {
+    "catalog": "135.0682.810",
+    "material_text": "MRG 210-52 3 1/2\" DRKV OT OBL VUEL PW",
+    "label": "135.0680.613"
+  },
+  {
+    "catalog": "135.0682.809",
+    "material_text": "MRG 210-52 3 1/2\" DRKV OT OBL VUEL ST",
+    "label": "135.0680.612"
+  },
+  {
+    "catalog": "135.0682.808",
+    "material_text": "MRG 210-52 3 1/2\" DRKV OT OBL VUEL ON",
+    "label": "135.0680.589"
+  },
+  {
+    "catalog": "135.0682.807",
+    "material_text": "MRG 210-37 3 1/2\" DRKV OT OBL VUEL MB",
+    "label": "135.0680.611"
+  },
+  {
+    "catalog": "135.0682.806",
+    "material_text": "MRG 210-37 3 1/2\" DRKV OT OBL VUEL OS",
+    "label": "135.0680.600"
+  },
+  {
+    "catalog": "135.0682.805",
+    "material_text": "MRG 210-37 3 1/2\" DRKV OT OBL VUEL PW",
+    "label": "135.0680.599"
+  },
+  {
+    "catalog": "135.0682.804",
+    "material_text": "MRG 210-37 3 1/2\" DRKV OT OBL VUEL ST",
+    "label": "135.0680.598"
+  },
+  {
+    "catalog": "135.0682.797",
+    "material_text": "MRG 210-37 3 1/2\" DRKV OT OBL VUEL ON",
+    "label": "135.0680.588"
+  },
+  {
+    "catalog": "135.0627.324",
+    "material_text": "FSG 211-86 3 1/2\" DRKV MUE REV MB",
+    "label": "135.0626.820"
+  },
+  {
+    "catalog": "135.0556.703",
+    "material_text": "FSG 211-86 DRUKVMUE REV ON",
+    "label": "135.0519.007"
+  },
+  {
+    "catalog": "130.0748.974",
+    "material_text": "BFK 720-36-36 3 1/2 SV OT MRU Glacier gl",
+    "label": "130.0729.667"
+  },
+  {
+    "catalog": "127.0747.100",
+    "material_text": "BXX Pro 210/110-70 3 1/2\" DrK OT UEL",
+    "label": "127.0751.882"
+  },
+  {
+    "catalog": "127.0747.099",
+    "material_text": "BXX Pro 210/110-50 3 1/2\" DrK OT UEL",
+    "label": "127.0751.881"
+  },
+  {
+    "catalog": "127.0747.098",
+    "material_text": "BXX Pro 210-70 A 3 1/2\" DrK OT UEL",
+    "label": "127.0751.880"
+  },
+  {
+    "catalog": "127.0747.097",
+    "material_text": "BXX Pro 210-50 A 3 1/2\" DrK OT UEL",
+    "label": "127.0751.879"
+  },
+  {
+    "catalog": "127.0747.096",
+    "material_text": "BXX Pro 210/110-70 3 1/2\" SV OT UEL",
+    "label": "127.0751.882"
+  },
+  {
+    "catalog": "127.0747.095",
+    "material_text": "BXX Pro 210/110-50 3 1/2\" SV OT UEL",
+    "label": "127.0751.881"
+  },
+  {
+    "catalog": "127.0708.310",
+    "material_text": "SRX 110-50 3 1/2\" SV VUEL FRL CLI",
+    "label": "122.0685.804"
+  },
+  {
+    "catalog": "127.0708.304",
+    "material_text": "SRX 110-50 3 1/2\" EXC VUEL FRL CLI",
+    "label": "122.0685.804"
+  },
+  {
+    "catalog": "127.0708.301",
+    "material_text": "SRX 210-40 3 1/2\" EXC VUEL FRL CLI",
+    "label": "127.0685.716"
+  },
+  {
+    "catalog": "127.0708.297",
+    "material_text": "SRX 210-50 3 1/2\" EXC VUEL FRL CLI",
+    "label": "127.0685.805"
+  },
+  {
+    "catalog": "127.0708.295",
+    "material_text": "SRX 210-40 3 1/2\" SV VUEL FRL CLI",
+    "label": "127.0685.716"
+  },
+  {
+    "catalog": "127.0708.293",
+    "material_text": "SRX 210-50 3 1/2\" SV VUEL FRL CLI",
+    "label": "127.0685.805"
+  },
+  {
+    "catalog": "127.0708.292",
+    "material_text": "SRX 210-40 3 1/2\" A EXC 2LB UEL FRL CLI",
+    "label": "127.0704.170"
+  },
+  {
+    "catalog": "127.0708.283",
+    "material_text": "SRX 210-50 3 1/2\" A EXC 2LB UEL FRL CLI",
+    "label": "127.0704.181"
+  },
+  {
+    "catalog": "127.0705.384",
+    "material_text": "SRX 210-40 A 3 1/2\" SV LB VUEL CLI",
+    "label": "127.0685.777"
+  },
+  {
+    "catalog": "127.0705.382",
+    "material_text": "SRX 210-50 A 3 1/2\" SV LB VUEL CLI",
+    "label": "127.0685.775"
+  },
+  {
+    "catalog": "127.0676.885",
+    "material_text": "BXM 210/110-68 3 1/2\" DRKV OBL BG+RB AN",
+    "label": "127.0627.491"
+  },
+  {
+    "catalog": "127.0674.583",
+    "material_text": "BXM 210/110-40 3 1/2\" SV OLB BG CP BOX",
+    "label": "127.0627.357"
+  },
+  {
+    "catalog": "127.0674.582",
+    "material_text": "BXM 210/110-40 3 1/2\" SV OLB BG GD BOX",
+    "label": "127.0627.356"
+  },
+  {
+    "catalog": "127.0674.537",
+    "material_text": "BXM 210/110-40 3 1/2\" SV OLB BG AN BOX",
+    "label": "127.0627.353"
+  },
+  {
+    "catalog": "127.0674.535",
+    "material_text": "BXM 210/110-68 3 1/2\" SV OLB BG CP BOX",
+    "label": "127.0627.493"
+  },
+  {
+    "catalog": "127.0674.533",
+    "material_text": "BXM 210/110-68 3 1/2\" SV OLB BG GD BOX",
+    "label": "127.0627.492"
+  },
+  {
+    "catalog": "127.0674.440",
+    "material_text": "BXM 210/110-68 3 1/2\" SV OLB BG AN BOX",
+    "label": "127.0627.491"
+  },
+  {
+    "catalog": "127.0674.363",
+    "material_text": "BXM 210/110-50 3 1/2\" SV OLB BG CP BOX",
+    "label": "127.0627.360"
+  },
+  {
+    "catalog": "127.0674.362",
+    "material_text": "BXM 210/110-50 3 1/2\" SV OLB BG GD BOX",
+    "label": "127.0627.359"
+  },
+  {
+    "catalog": "127.0672.129",
+    "material_text": "BXM 210/110-50 3 1/2\" SV OLB BG AN BOX",
+    "label": "127.0627.358"
+  },
+  {
+    "catalog": "127.0662.649",
+    "material_text": "BXM 210/110-40 3 1/2\" DRKV OT OBL BG CP",
+    "label": "127.0627.357"
+  },
+  {
+    "catalog": "127.0662.648",
+    "material_text": "BXM 210/110-40 3 1/2\" DRKV OT OBL BG GD",
+    "label": "127.0627.356"
+  },
+  {
+    "catalog": "127.0662.644",
+    "material_text": "BXM 210/110-68 3 1/2\" DRKV OT OBL BG CP",
+    "label": "127.0627.493"
+  },
+  {
+    "catalog": "127.0662.643",
+    "material_text": "BXM 210/110-68 3 1/2\" DRKV OT OBL BG GD",
+    "label": "127.0627.492"
+  },
+  {
+    "catalog": "127.0662.642",
+    "material_text": "BXM 210-50 3 1/2\" DRKV OT OBL MUE BG CP",
+    "label": "127.0627.360"
+  },
+  {
+    "catalog": "127.0662.540",
+    "material_text": "BXM 210/110-50 3 1/2\" DRKV OT OBL BG GD",
+    "label": "127.0627.359"
+  },
+  {
+    "catalog": "127.0658.795",
+    "material_text": "BCX 210-51 A 3 1/2\" SV OT UEL 1LB Edst",
+    "label": "127.0541.036"
+  },
+  {
+    "catalog": "127.0658.794",
+    "material_text": "BCX 210-51 A 3 1/2\" EXC UEL 2LB Edst",
+    "label": "127.0655.167"
+  },
+  {
+    "catalog": "127.0658.527",
+    "material_text": "MYX 210-70 3 1/2\" I SV OT UEL OBL Edst",
+    "label": "127.0590.926"
+  },
+  {
+    "catalog": "127.0658.065",
+    "material_text": "MYX 210-34 3 1/2\" I SV OT UEL OBL Edst",
+    "label": "127.0590.865"
+  },
+  {
+    "catalog": "127.0658.064",
+    "material_text": "MYX 210-45 3 1/2\" I SV OT UEL OBL Edst",
+    "label": "127.0590.868"
+  },
+  {
+    "catalog": "127.0658.063",
+    "material_text": "MYX 210-50 3 1/2\" I SV OT UEL OBL Edst",
+    "label": "127.0590.870"
+  },
+  {
+    "catalog": "127.0658.062",
+    "material_text": "MYX 210-55 3 1/2\" I SV OT UEL OBL Edst",
+    "label": "127.0590.923"
+  },
+  {
+    "catalog": "127.0650.364",
+    "material_text": "BXM 210/110-68 3 1/2\" DRKV OT OBL BG AN",
+    "label": "127.0627.491"
+  },
+  {
+    "catalog": "127.0650.363",
+    "material_text": "BXM 210-50 3 1/2\" DRKV OT OBL MUE BG AN",
+    "label": "127.0627.358"
+  },
+  {
+    "catalog": "127.0650.362",
+    "material_text": "BXM 210/110-40 3 1/2\" DRKV OT OBL BG AN",
+    "label": "127.0627.353"
+  },
+  {
+    "catalog": "127.0642.078",
+    "material_text": "MYX 251-86A 3 1/2\" I DRKV TR MUE 2BL",
+    "label": "127.0629.267"
+  },
+  {
+    "catalog": "127.0642.077",
+    "material_text": "MYX 251-86A 3 1/2\" I DRKV TL MUE 2BL",
+    "label": "127.0629.266"
+  },
+  {
+    "catalog": "127.0642.076",
+    "material_text": "MYX 211-86 3 1/2\" I DRKV TR MUE OBL",
+    "label": "127.0629.243"
+  },
+  {
+    "catalog": "127.0642.075",
+    "material_text": "MYX 211-86 3 1/2\" I DRKV TL MUE OBL",
+    "label": "127.0628.920"
+  },
+  {
+    "catalog": "127.0642.074",
+    "material_text": "MYX 211-86A 3 1/2\" I DRKV TR MUE 2BL",
+    "label": "127.0628.837"
+  },
+  {
+    "catalog": "127.0642.000",
+    "material_text": "MYX 211-86A 3 1/2\" I DRKV TL MUE 2BL",
+    "label": "127.0628.836"
+  },
+  {
+    "catalog": "127.0641.999",
+    "material_text": "MYX 210-50A 3 1/2\" I DRKV MUE 2BL",
+    "label": "127.0628.831"
+  },
+  {
+    "catalog": "127.0625.407",
+    "material_text": "MRX 210-55 3 1/2\" MAV SV OT OLB UEL",
+    "label": "127.0538.635"
+  },
+  {
+    "catalog": "127.0625.406",
+    "material_text": "MRX 210-45 3 1/2\" MAV SV OT OLB UEL",
+    "label": "127.0538.629"
+  },
+  {
+    "catalog": "127.0625.405",
+    "material_text": "MRX 210-55 3 1/2\" MAV EXC OT OLB UEL",
+    "label": "127.0538.635"
+  },
+  {
+    "catalog": "127.0625.404",
+    "material_text": "MRX 210-45 3 1/2\" MAV EXC OT OLB UEL",
+    "label": "127.0538.629"
+  },
+  {
+    "catalog": "127.0625.055",
+    "material_text": "MYX 210-70 3 1/2\" I DRKVIMUEA OLB",
+    "label": "127.0590.926"
+  },
+  {
+    "catalog": "127.0625.054",
+    "material_text": "MYX 210-55 3 1/2\" I DRKVIMUEA OLB",
+    "label": "127.0590.923"
+  },
+  {
+    "catalog": "127.0625.053",
+    "material_text": "MYX 210-45 3 1/2\" I DRKVIMUEA OLB",
+    "label": "127.0590.868"
+  },
+  {
+    "catalog": "127.0625.052",
+    "material_text": "MYX 210-34 3 1/2\" I DRKVIMUEA OLB",
+    "label": "127.0590.865"
+  },
+  {
+    "catalog": "127.0622.697",
+    "material_text": "MYX 210-50 3 1/2\" I DRKVIMUEA OLB",
+    "label": "127.0590.870"
+  },
+  {
+    "catalog": "127.0558.826",
+    "material_text": "BWX 220-54-27 A 3 1/2\" DRKV WCR VUEL+ZUB",
+    "label": "127.0543.036"
+  },
+  {
+    "catalog": "127.0558.824",
+    "material_text": "BWX 220-54-27 A 3 1/2\" MAV WCL VUEL+ZUB",
+    "label": "127.0543.037"
+  },
+  {
+    "catalog": "127.0541.494",
+    "material_text": "MRX 210-34  3 1/2\" MAV SV OT OLB UEL",
+    "label": "127.0521.906"
+  },
+  {
+    "catalog": "127.0541.492",
+    "material_text": "MRX 210-50 A 3 1/2\" MAV SV OT LB UEL",
+    "label": "127.0517.606"
+  },
+  {
+    "catalog": "127.0541.491",
+    "material_text": "MRX 210-40 A 3 1/2\" MAV SV OT LB UEL",
+    "label": "127.0517.605"
+  },
+  {
+    "catalog": "127.0541.470",
+    "material_text": "MRX 210-50 3 1/2\" MAV SV OT OLB UEL",
+    "label": "127.0517.272"
+  },
+  {
+    "catalog": "127.0541.469",
+    "material_text": "MRX 210-40  3 1/2\" MAV SV OT OLB UEL",
+    "label": "127.0517.117"
+  },
+  {
+    "catalog": "127.0537.611",
+    "material_text": "MRX 210-40 3 1/2\" MAV EXC OT OLB UEL",
+    "label": "127.0517.117"
+  },
+  {
+    "catalog": "127.0537.590",
+    "material_text": "MRX 210-34 3 1/2\" MAV EXC OT OLB UEL",
+    "label": "127.0521.906"
+  },
+  {
+    "catalog": "127.0537.588",
+    "material_text": "MRX 210-50 A 3 1/2\" MAV EXC OT 2LB UEL",
+    "label": "127.0539.714"
+  },
+  {
+    "catalog": "127.0537.586",
+    "material_text": "MRX 210-40 A 3 1/2\" MAV EXC OT 2LB UEL",
+    "label": "127.0539.713"
+  },
+  {
+    "catalog": "127.0537.584",
+    "material_text": "MRX 210-50 3 1/2\" MAV EXC OT OLB UEL",
+    "label": "127.0517.272"
+  },
+  {
+    "catalog": "127.0476.704",
+    "material_text": "BXX 220-36-36A 31/2\" I DRKV OT A 2LB",
+    "label": "127.0371.855"
+  },
+  {
+    "catalog": "127.0476.541",
+    "material_text": "AGX 211-78 G 3 1/2\" I DRKV REV UEL 2BL",
+    "label": "127.0469.341"
+  },
+  {
+    "catalog": "127.0476.450",
+    "material_text": "AGX 211-62 G 3 1/2\" I DRKV REV UEL 2BL",
+    "label": "127.0469.342"
+  },
+  {
+    "catalog": "127.0380.403",
+    "material_text": "AGX 211-86 3 1/2\" I DrK REV UEL 2BL",
+    "label": "127.0192.253"
+  },
+  {
+    "catalog": "127.0380.396",
+    "material_text": "AGX 211-100 3 1/2\" I DrK REV UEL 2BL",
+    "label": "127.0193.099"
+  },
+  {
+    "catalog": "127.0380.391",
+    "material_text": "AGX 251 G 3 1/2\" I DrK REV UEL 2BL",
+    "label": "127.0192.254"
+  },
+  {
+    "catalog": "127.0378.735",
+    "material_text": "HDX 284 3 1/2\" I DrK REV UEL 2BL",
+    "label": "127.0374.126"
+  },
+  {
+    "catalog": "127.0378.733",
+    "material_text": "HDX 254 3 1/2\" I DrK REV UEL 2BL",
+    "label": "127.0374.125"
+  },
+  {
+    "catalog": "127.0378.717",
+    "material_text": "HDX 214 3 1/2\" I DrK REV UEL 2BL",
+    "label": "127.0374.122"
+  },
+  {
+    "catalog": "127.0375.343",
+    "material_text": "BXX 260-36-16A 31/2\" I MAV A DrK 2LB",
+    "label": "127.0360.803"
+  },
+  {
+    "catalog": "127.0375.342",
+    "material_text": "BXX 210-50A 3 1/2\" I MAV DrK A 2LB MUE",
+    "label": "127.0360.789"
+  },
+  {
+    "catalog": "127.0375.341",
+    "material_text": "BXX 210-40A 3 1/2\" I MAV DrK A 2LB MUE",
+    "label": "127.0360.787"
+  },
+  {
+    "catalog": "127.0375.280",
+    "material_text": "BXX 260/160-34-16 3 1/2\" I MAV DrK OLB",
+    "label": "127.0360.801"
+  },
+  {
+    "catalog": "127.0375.279",
+    "material_text": "BXX 260/160-34-16 31/2\" I SV OLB R12",
+    "label": "127.0360.801"
+  },
+  {
+    "catalog": "127.0375.278",
+    "material_text": "BXX 210/110-54 3 1/2\" I MAV DrK OT OLB",
+    "label": "127.0360.785"
+  },
+  {
+    "catalog": "127.0375.277",
+    "material_text": "BXX 210/110-54 3 1/2\" I SV OT OLB MUE",
+    "label": "127.0360.785"
+  },
+  {
+    "catalog": "127.0375.273",
+    "material_text": "BXX 210/110-50 3 1/2\" I MAV DrK OT OLB",
+    "label": "127.0369.914"
+  },
+  {
+    "catalog": "127.0375.271",
+    "material_text": "BXX 210/110-50 3 1/2\" I SV OT OLB",
+    "label": "127.0369.914"
+  },
+  {
+    "catalog": "127.0375.257",
+    "material_text": "BXX 210/110-45 3 1/2\" I MAV DrK OT OLB",
+    "label": "127.0360.783"
+  },
+  {
+    "catalog": "127.0375.256",
+    "material_text": "BXX 210/110-45 3 1/2\" I SV OT OLB MUE",
+    "label": "127.0360.783"
+  },
+  {
+    "catalog": "127.0375.252",
+    "material_text": "BXX 210/110-40 3 1/2\" I MAV DrK OT OLB",
+    "label": "127.0369.024"
+  },
+  {
+    "catalog": "127.0375.230",
+    "material_text": "BXX 210/110-40 3 1/2\" I SV OT OLB",
+    "label": "127.0369.024"
+  },
+  {
+    "catalog": "127.0374.687",
+    "material_text": "BXX 210/110-34 3 1/2\" I MAV DrK OT OLB",
+    "label": "127.0360.760"
+  },
+  {
+    "catalog": "127.0374.686",
+    "material_text": "BXX 210/110-34 3 1/2\" I SV OT OLB",
+    "label": "127.0360.760"
+  },
+  {
+    "catalog": "127.0374.673",
+    "material_text": "BXX 210/110-16 3 1/2\" I DRKV OLB OT",
+    "label": "127.0360.752"
+  },
+  {
+    "catalog": "127.0374.672",
+    "material_text": "BXX 210/110-16 3 1/2\" I SV OLB OT",
+    "label": "127.0360.752"
+  },
+  {
+    "catalog": "127.0371.769",
+    "material_text": "RPX 251 3 1/2\" EXC REV MUE 2BL FRL",
+    "label": "127.0359.445"
+  },
+  {
+    "catalog": "127.0371.767",
+    "material_text": "RPX 211-86 3 1/2\" EXC REV MUE 2BL FRL",
+    "label": "127.0359.409"
+  },
+  {
+    "catalog": "125.0747.724",
+    "material_text": "KNG 110-37 3 1/2\" DRKV OT VUEL SG ZUB",
+    "label": "125.0706.703"
+  },
+  {
+    "catalog": "125.0747.723",
+    "material_text": "KNG 110-52 3 1/2\" DRKV OT VUEL SG ZUB",
+    "label": "125.0706.704"
+  },
+  {
+    "catalog": "125.0747.722",
+    "material_text": "KNG 110-62 3 1/2\" DRKV OT VUEL SG ZUB",
+    "label": "125.0706.705"
+  },
+  {
+    "catalog": "125.0747.721",
+    "material_text": "KNG 110-62 3 1/2\" EXC OT VUEL MBC ZUB",
+    "label": "125.0626.862"
+  },
+  {
+    "catalog": "125.0747.720",
+    "material_text": "KNG 110-52 3 1/2\" EXC OT VUEL MBC ZUB",
+    "label": "125.0626.861"
+  },
+  {
+    "catalog": "125.0747.719",
+    "material_text": "KNG 110-37 3 1/2\" EXC OT VUEL MBC ZUB",
+    "label": "125.0626.860"
+  },
+  {
+    "catalog": "125.0747.718",
+    "material_text": "KNG 110-62 3 1/2\" DRKV OT VUEL MB ZUB",
+    "label": "125.0626.862"
+  },
+  {
+    "catalog": "125.0747.717",
+    "material_text": "KNG 110-37 3 1/2\" DRKV OT VUEL MB ZUB",
+    "label": "125.0626.860"
+  },
+  {
+    "catalog": "125.0747.716",
+    "material_text": "KNG 110-52 3 1/2\" DRKV OT VUEL MB ZUB",
+    "label": "125.0626.861"
+  },
+  {
+    "catalog": "125.0747.715",
+    "material_text": "KNG 110-62 3 1/2\" DRKV OT VUEL ST ZUB",
+    "label": "125.0507.847"
+  },
+  {
+    "catalog": "125.0747.714",
+    "material_text": "KNG 110-62 3 1/2\" DRKV OT VUEL GL ZUB",
+    "label": "125.0507.846"
+  },
+  {
+    "catalog": "125.0747.713",
+    "material_text": "KNG 110-62 3 1/2\" DRKV OT VUEL OS ZUB",
+    "label": "125.0507.844"
+  },
+  {
+    "catalog": "125.0747.712",
+    "material_text": "KNG 110-62 3 1/2\" DRKV OT VUEL ON ZUB",
+    "label": "125.0507.843"
+  },
+  {
+    "catalog": "125.0747.711",
+    "material_text": "KNG 110-52 3 1/2\" DRKV OT VUEL ST ZUB",
+    "label": "125.0507.835"
+  },
+  {
+    "catalog": "125.0747.710",
+    "material_text": "KNG 110-52 3 1/2\" DRKV OT VUEL GL ZUB",
+    "label": "125.0507.834"
+  },
+  {
+    "catalog": "125.0747.709",
+    "material_text": "KNG 110-52 3 1/2\" DRKV OT VUEL OS ZUB",
+    "label": "125.0507.832"
+  },
+  {
+    "catalog": "125.0747.708",
+    "material_text": "KNG 110-52 3 1/2\" DRKV OT VUEL ON ZUB",
+    "label": "125.0507.831"
+  },
+  {
+    "catalog": "125.0747.707",
+    "material_text": "KNG 110-37 3 1/2\" DRKV OT VUEL ST ZUB",
+    "label": "125.0507.824"
+  },
+  {
+    "catalog": "125.0747.706",
+    "material_text": "KNG 110-37 3 1/2\" DRKV OT VUEL GL ZUB",
+    "label": "125.0507.823"
+  },
+  {
+    "catalog": "125.0747.705",
+    "material_text": "KNG 110-37 3 1/2\" DRKV OT VUEL OS ZUB",
+    "label": "125.0507.821"
+  },
+  {
+    "catalog": "125.0747.704",
+    "material_text": "KNG 110-37 3 1/2\" DRKV OT VUEL ON ZUB",
+    "label": "125.0507.789"
+  },
+  {
+    "catalog": "125.0715.498",
+    "material_text": "MRG 110-37 3 1/2\" SV OT OBL VUEL SG",
+    "label": "125.0706.706"
+  },
+  {
+    "catalog": "125.0715.497",
+    "material_text": "MRG 110-37 3 1/2\" DRKV OT OBL VUEL SG",
+    "label": "125.0706.706"
+  },
+  {
+    "catalog": "125.0715.496",
+    "material_text": "MRG 110-52 3 1/2\" SV OT OBL VUEL SG",
+    "label": "125.0706.708"
+  },
+  {
+    "catalog": "125.0715.495",
+    "material_text": "MRG 110-52 3 1/2\" DRKV OT OBL VUEL SG",
+    "label": "125.0706.708"
+  },
+  {
+    "catalog": "125.0715.494",
+    "material_text": "MRG 110-72 3 1/2\" SV OT OBL VUEL SG",
+    "label": "125.0706.711"
+  },
+  {
+    "catalog": "125.0715.493",
+    "material_text": "MRG 110-72 3 1/2\" DRKV OT OBL VUEL SG",
+    "label": "125.0706.711"
+  },
+  {
+    "catalog": "125.0715.492",
+    "material_text": "KNG 110-37 3 1/2\" DRKV OT VUEL SG",
+    "label": "125.0706.703"
+  },
+  {
+    "catalog": "125.0715.491",
+    "material_text": "KNG 110-52 3 1/2\" DRKV OT VUEL SG",
+    "label": "125.0706.704"
+  },
+  {
+    "catalog": "125.0715.460",
+    "material_text": "KNG 110-62 3 1/2\" DRKV OT VUEL SG",
+    "label": "125.0706.705"
+  },
+  {
+    "catalog": "125.0685.162",
+    "material_text": "KNG 110-62 3 1/2\" EXC REV OT VUEL MBC",
+    "label": "125.0626.862"
+  },
+  {
+    "catalog": "125.0685.161",
+    "material_text": "KNG 110-52 3 1/2\" EXC OT VUEL MBC",
+    "label": "125.0626.861"
+  },
+  {
+    "catalog": "125.0685.110",
+    "material_text": "KNG 110-37 3 1/2\" EXC OT VUEL MBC",
+    "label": "125.0626.860"
+  },
+  {
+    "catalog": "125.0683.236",
+    "material_text": "MRG 110-72 3 1/2\" EXC OT OBL VUEL MBC",
+    "label": "125.0680.705"
+  },
+  {
+    "catalog": "125.0683.235",
+    "material_text": "MRG 110-72 3 1/2\" SV OT OBL VUEL MBC",
+    "label": "125.0680.705"
+  },
+  {
+    "catalog": "125.0683.234",
+    "material_text": "MRG 110-52 3 1/2\" EXC OT OBL VUEL MBC",
+    "label": "125.0680.691"
+  },
+  {
+    "catalog": "125.0683.233",
+    "material_text": "MRG 110-52 3 1/2\" SV OT OBL VUEL MBC",
+    "label": "125.0680.691"
+  },
+  {
+    "catalog": "125.0683.232",
+    "material_text": "MRG 110-37 3 1/2\" EXC OT OBL VUEL MBC",
+    "label": "125.0680.684"
+  },
+  {
+    "catalog": "125.0683.231",
+    "material_text": "MRG 110-37 3 1/2\" SV OT OBL VUEL MBC",
+    "label": "125.0680.684"
+  },
+  {
+    "catalog": "125.0683.189",
+    "material_text": "MRG 110-72 3 1/2\" SV OT OBL VUEL MB",
+    "label": "125.0680.705"
+  },
+  {
+    "catalog": "125.0683.188",
+    "material_text": "MRG 110-72 3 1/2\" SV OT OBL VUEL OS",
+    "label": "125.0680.703"
+  },
+  {
+    "catalog": "125.0683.187",
+    "material_text": "MRG 110-72 3 1/2\" SV OT OBL VUEL PW",
+    "label": "125.0680.701"
+  },
+  {
+    "catalog": "125.0683.186",
+    "material_text": "MRG 110-72 3 1/2\" SV OT OBL VUEL ST",
+    "label": "125.0680.699"
+  },
+  {
+    "catalog": "125.0683.185",
+    "material_text": "MRG 110-72 3 1/2\" SV OT OBL VUEL ON",
+    "label": "125.0680.671"
+  },
+  {
+    "catalog": "125.0683.184",
+    "material_text": "MRG 110-52 3 1/2\" SV OT OBL VUEL MB",
+    "label": "125.0680.691"
+  },
+  {
+    "catalog": "125.0683.183",
+    "material_text": "MRG 110-52 3 1/2\" SV OT OBL VUEL OS",
+    "label": "125.0680.689"
+  },
+  {
+    "catalog": "125.0683.182",
+    "material_text": "MRG 110-52 3 1/2\" SV OT OBL VUEL PW",
+    "label": "125.0680.687"
+  },
+  {
+    "catalog": "125.0683.181",
+    "material_text": "MRG 110-52 3 1/2\" SV OT OBL VUEL ST",
+    "label": "125.0680.685"
+  },
+  {
+    "catalog": "125.0683.140",
+    "material_text": "MRG 110-52 3 1/2\" SV OT OBL VUEL ON",
+    "label": "125.0680.659"
+  },
+  {
+    "catalog": "125.0683.139",
+    "material_text": "MRG 110-37 3 1/2\" SV OT OBL VUEL MB",
+    "label": "125.0680.684"
+  },
+  {
+    "catalog": "125.0683.138",
+    "material_text": "MRG 110-37 3 1/2\" SV OT OBL VUEL OS",
+    "label": "125.0680.682"
+  },
+  {
+    "catalog": "125.0683.137",
+    "material_text": "MRG 110-37 3 1/2\" SV OT OBL VUEL PW",
+    "label": "125.0680.680"
+  },
+  {
+    "catalog": "125.0683.136",
+    "material_text": "MRG 110-37 3 1/2\" SV OT OBL VUEL ST",
+    "label": "125.0680.678"
+  },
+  {
+    "catalog": "125.0683.135",
+    "material_text": "MRG 110-37 3 1/2\" SV OT OBL VUEL ON",
+    "label": "125.0680.658"
+  },
+  {
+    "catalog": "125.0683.110",
+    "material_text": "MRG 110-72 3 1/2\" DRKV OT OBL VUEL MB",
+    "label": "125.0680.705"
+  },
+  {
+    "catalog": "125.0683.109",
+    "material_text": "MRG 110-72 3 1/2\" DRKV OT OBL VUEL OS",
+    "label": "125.0680.703"
+  },
+  {
+    "catalog": "125.0683.108",
+    "material_text": "MRG 110-72 3 1/2\" DRKV OT OBL VUEL PW",
+    "label": "125.0680.701"
+  },
+  {
+    "catalog": "125.0683.107",
+    "material_text": "MRG 110-72 3 1/2\" DRKV OT OBL VUEL ST",
+    "label": "125.0680.699"
+  },
+  {
+    "catalog": "125.0683.106",
+    "material_text": "MRG 110-72 3 1/2\" DRKV OT OBL VUEL ON",
+    "label": "125.0680.671"
+  },
+  {
+    "catalog": "125.0683.105",
+    "material_text": "MRG 110-52 3 1/2\" DRKV OT OBL VUEL MB",
+    "label": "125.0680.691"
+  },
+  {
+    "catalog": "125.0683.104",
+    "material_text": "MRG 110-52 3 1/2\" DRKV OT OBL VUEL OS",
+    "label": "125.0680.689"
+  },
+  {
+    "catalog": "125.0683.103",
+    "material_text": "MRG 110-52 3 1/2\" DRKV OT OBL VUEL PW",
+    "label": "125.0680.687"
+  },
+  {
+    "catalog": "125.0683.102",
+    "material_text": "MRG 110-52 3 1/2\" DRKV OT OBL VUEL ST",
+    "label": "125.0680.685"
+  },
+  {
+    "catalog": "125.0683.101",
+    "material_text": "MRG 110-52 3 1/2\" DRKV OT OBL VUEL ON",
+    "label": "125.0680.659"
+  },
+  {
+    "catalog": "125.0683.060",
+    "material_text": "MRG 110-37 3 1/2\" DRKV OT OBL VUEL MB",
+    "label": "125.0680.684"
+  },
+  {
+    "catalog": "125.0683.059",
+    "material_text": "MRG 110-37 3 1/2\" DRKV OT OBL VUEL OS",
+    "label": "125.0680.682"
+  },
+  {
+    "catalog": "125.0683.058",
+    "material_text": "MRG 110-37 3 1/2\" DRKV OT OBL VUEL PW",
+    "label": "125.0680.680"
+  },
+  {
+    "catalog": "125.0683.057",
+    "material_text": "MRG 110-37 3 1/2\" DRKV OT OBL VUEL ST",
+    "label": "125.0680.678"
+  },
+  {
+    "catalog": "125.0683.056",
+    "material_text": "MRG 110-37 3 1/2\" DRKV OT OBL VUEL ON",
+    "label": "125.0680.658"
+  },
+  {
+    "catalog": "125.0627.321",
+    "material_text": "KNG 110-62 3 1/2\" DRKV REV OT VUEL MB",
+    "label": "125.0626.862"
+  },
+  {
+    "catalog": "125.0627.320",
+    "material_text": "KNG 110-37 3 1/2\" DRKV OT VUEL MB",
+    "label": "125.0626.860"
+  },
+  {
+    "catalog": "125.0627.319",
+    "material_text": "KNG 110-52 3 1/2\" DRKV OT VUEL MB",
+    "label": "125.0626.861"
+  },
+  {
+    "catalog": "125.0512.518",
+    "material_text": "KNG 110-62 3 1/2\" DRKV OT VUEL Steingrau",
+    "label": "125.0507.847"
+  },
+  {
+    "catalog": "125.0512.517",
+    "material_text": "KNG 110-62 3 1/2\" DRKV OT VUEL Glacier",
+    "label": "125.0507.846"
+  },
+  {
+    "catalog": "125.0512.516",
+    "material_text": "KNG 110-62 3 1/2\" DRKV OT VUEL Cashmere",
+    "label": "125.0507.844"
+  },
+  {
+    "catalog": "125.0512.515",
+    "material_text": "KNG 110-62 3 1/2\" DRKV OT VUEL Onyx",
+    "label": "125.0507.843"
+  },
+  {
+    "catalog": "125.0512.507",
+    "material_text": "KNG 110-52 3 1/2\" DRKV OT VUEL Steingrau",
+    "label": "125.0507.835"
+  },
+  {
+    "catalog": "125.0512.506",
+    "material_text": "KNG 110-52 3 1/2\" DRKV OT VUEL Glacier",
+    "label": "125.0507.834"
+  },
+  {
+    "catalog": "125.0512.505",
+    "material_text": "KNG 110-52 3 1/2\" DRKV OT VUEL Cashmere",
+    "label": "125.0507.832"
+  },
+  {
+    "catalog": "125.0512.504",
+    "material_text": "KNG 110-52 3 1/2\" DRKV OT VUEL Onyx",
+    "label": "125.0507.831"
+  },
+  {
+    "catalog": "125.0512.452",
+    "material_text": "KNG 110-37 3 1/2\" DRKV OT VUEL Steingrau",
+    "label": "125.0507.824"
+  },
+  {
+    "catalog": "125.0512.451",
+    "material_text": "KNG 110-37 3 1/2\" DRKV OT VUEL Glacier",
+    "label": "125.0507.823"
+  },
+  {
+    "catalog": "125.0512.450",
+    "material_text": "KNG 110-37 3 1/2\" DRKV OT VUEL Cashmere",
+    "label": "125.0507.821"
+  },
+  {
+    "catalog": "125.0512.449",
+    "material_text": "KNG 110-37 3 1/2\" DRKV OT VUEL Onyx",
+    "label": "125.0507.789"
+  },
+  {
+    "catalog": "124.0747.163",
+    "material_text": "MYK 610-52 A 3 1/2\" DrK OT GL Gl\u00e4nzend",
+    "label": "124.0747.111"
+  },
+  {
+    "catalog": "124.0747.162",
+    "material_text": "MYK 610-52 A 3 1/2\" DrK OT MG Gl\u00e4nzend",
+    "label": "124.0747.110"
+  },
+  {
+    "catalog": "124.0747.161",
+    "material_text": "MYK 610-52 A 3 1/2\" DrK OT ON Gl\u00e4nzend",
+    "label": "124.0747.109"
+  },
+  {
+    "catalog": "124.0747.160",
+    "material_text": "MYK 610-52 A 3 1/2\" DrK OT Anthr. Matt",
+    "label": "124.0747.108"
+  },
+  {
+    "catalog": "124.0747.159",
+    "material_text": "MYK 611-100 A 3 1/2\" DrK TR GL Gl\u00e4nzend",
+    "label": "124.0747.107"
+  },
+  {
+    "catalog": "124.0747.158",
+    "material_text": "MYK 611-100 A 3 1/2\" DrK TR MG Gl\u00e4nzend",
+    "label": "124.0747.106"
+  },
+  {
+    "catalog": "124.0747.157",
+    "material_text": "MYK 611-100 A 3 1/2\" DrK TR ON Gl\u00e4nzend",
+    "label": "124.0747.105"
+  },
+  {
+    "catalog": "124.0747.156",
+    "material_text": "MYK 611-100 A 3 1/2\" DrK TR Anthr. Matt",
+    "label": "124.0747.104"
+  },
+  {
+    "catalog": "124.0747.155",
+    "material_text": "MYK 611-100 A 3 1/2\" DrK TL GL Gl\u00e4nzend",
+    "label": "124.0747.103"
+  },
+  {
+    "catalog": "124.0747.154",
+    "material_text": "MYK 611-100 A 3 1/2\" DrK TL MG Gl\u00e4nzend",
+    "label": "124.0747.102"
+  },
+  {
+    "catalog": "124.0747.153",
+    "material_text": "MYK 611-100 A 3 1/2\" DrK TL ON Gl\u00e4nzend",
+    "label": "124.0747.101"
+  },
+  {
+    "catalog": "124.0747.152",
+    "material_text": "MYK 611-100 A 3 1/2\" DrK TL Anthr. Matt",
+    "label": "124.0747.079"
+  },
+  {
+    "catalog": "124.0744.939",
+    "material_text": "MXK 611-100 3 1/2\" DrV VB REV 2LB AN Mat",
+    "label": "124.0744.485"
+  },
+  {
+    "catalog": "124.0744.938",
+    "material_text": "MXK 611-100 3 1/2\" DrV VB REV 2LB ON Gl.",
+    "label": "124.0744.484"
+  },
+  {
+    "catalog": "124.0744.937",
+    "material_text": "MXK 611-100 3 1/2\" DrV VB REV 2LB MG Gl.",
+    "label": "124.0744.483"
+  },
+  {
+    "catalog": "124.0744.936",
+    "material_text": "MXK 611-100 3 1/2\" DrV VB REV 2LB Glacie",
+    "label": "124.0744.482"
+  },
+  {
+    "catalog": "122.0744.963",
+    "material_text": "SRX 110-45 3 1/2\" EXC  VUEL OLB FRL",
+    "label": "122.0735.606"
+  },
+  {
+    "catalog": "122.0744.962",
+    "material_text": "SRX 110-45 3 1/2\" SV  VUEL OLB FRL",
+    "label": "122.0735.606"
+  },
+  {
+    "catalog": "122.0744.961",
+    "material_text": "SRX 110-40 3 1/2\" EXC  VUEL OLB FRL",
+    "label": "122.0735.603"
+  },
+  {
+    "catalog": "122.0744.950",
+    "material_text": "SRX 110-40 3 1/2\" SV  VUEL OLB FRL",
+    "label": "122.0735.603"
+  },
+  {
+    "catalog": "122.0744.949",
+    "material_text": "SRX 110-34 3 1/2\" EXC  VUEL OLB FRL",
+    "label": "122.0735.607"
+  },
+  {
+    "catalog": "122.0744.948",
+    "material_text": "SRX 110-34 3 1/2\" SV  VUEL OLB FRL",
+    "label": "122.0735.607"
+  },
+  {
+    "catalog": "122.0658.059",
+    "material_text": "MYX 160-34-16 3 1/2\" I SV OT UEL OBL Eds",
+    "label": "122.0590.995"
+  },
+  {
+    "catalog": "122.0658.058",
+    "material_text": "MYX 110-16 3 1/2\" I SV OT UEL OBL Edst",
+    "label": "122.0590.963"
+  },
+  {
+    "catalog": "122.0658.057",
+    "material_text": "MYX 110-34 3 1/2\" I SV OT UEL OBL Edst",
+    "label": "122.0590.965"
+  },
+  {
+    "catalog": "122.0658.056",
+    "material_text": "MYX 110-45 3 1/2\" I SV OT UEL OBL Edst",
+    "label": "122.0590.965"
+  },
+  {
+    "catalog": "122.0658.055",
+    "material_text": "MYX 110-50 3 1/2\" I SV OT UEL OBL Edst",
+    "label": "122.0590.969"
+  },
+  {
+    "catalog": "122.0658.054",
+    "material_text": "MYX 110-55 3 1/2\" I SV OT UEL OBL Edst",
+    "label": "122.0590.991"
+  },
+  {
+    "catalog": "122.0658.053",
+    "material_text": "MYX 110-70 3 1/2\" I SV OT UEL OBL Edst",
+    "label": "122.0590.993"
+  },
+  {
+    "catalog": "122.0627.021",
+    "material_text": "MYX 110-16 3 1/2\" I DRKVIMUEA OLB",
+    "label": "122.0590.963"
+  },
+  {
+    "catalog": "122.0626.778",
+    "material_text": "MRX 110-55 3 1/2\" EXC MUE OT OLB BOX",
+    "label": "122.0538.630"
+  },
+  {
+    "catalog": "122.0626.777",
+    "material_text": "MRX 110-45 3 1/2\" EXC MUE OT OLB BOX",
+    "label": "122.0538.626"
+  },
+  {
+    "catalog": "122.0625.060",
+    "material_text": "MYX 110-70 3 1/2\" I DRKVIMUEA OLB",
+    "label": "122.0590.993"
+  },
+  {
+    "catalog": "122.0625.059",
+    "material_text": "MYX 160-34-16 3 1/2\" I KBL DRKVIMUEA OLB",
+    "label": "122.0590.995"
+  },
+  {
+    "catalog": "122.0625.058",
+    "material_text": "MYX 110-55 3 1/2\" I DRKVIMUEA OLB",
+    "label": "122.0590.991"
+  },
+  {
+    "catalog": "122.0625.057",
+    "material_text": "MYX 110-45 3 1/2\" I DRKVIMUEA OLB",
+    "label": "122.0590.967"
+  },
+  {
+    "catalog": "122.0625.056",
+    "material_text": "MYX 110-34 3 1/2\" I DRKVIMUEA OLB",
+    "label": "122.0590.965"
+  },
+  {
+    "catalog": "122.0622.698",
+    "material_text": "MYX 110-50 3 1/2\" I DRKVIMUEA OLB",
+    "label": "122.0590.969"
+  },
+  {
+    "catalog": "122.0553.947",
+    "material_text": "MRX 110-55 3 1/2\" SV SIMUEA OT BOX",
+    "label": "122.0538.630"
+  },
+  {
+    "catalog": "122.0553.943",
+    "material_text": "MRX 110-45 3 1/2\" SV SIMUEA OT BOX",
+    "label": "122.0538.626"
+  },
+  {
+    "catalog": "122.0541.468",
+    "material_text": "MRX 110-34 3 1/2\" MAV SV OT OLB UEL",
+    "label": "122.0521.870"
+  },
+  {
+    "catalog": "122.0541.467",
+    "material_text": "MRX 110-50 3 1/2\" MAV SV OT OLB UEL",
+    "label": "122.0517.259"
+  },
+  {
+    "catalog": "122.0541.466",
+    "material_text": "MRX 110-40 3 1/2\" MAV SV OT OLB UEL",
+    "label": "122.0517.115"
+  },
+  {
+    "catalog": "122.0537.715",
+    "material_text": "MRX 110-34 3 1/2\" MAV EXC OT OLB UEL",
+    "label": "122.0521.870"
+  },
+  {
+    "catalog": "122.0537.714",
+    "material_text": "MRX 110-50 3 1/2\" MAV EXC OT OLB UEL",
+    "label": "122.0517.259"
+  },
+  {
+    "catalog": "122.0537.616",
+    "material_text": "MRX 110-40 3 1/2\" MAV EXC OT OLB UEL",
+    "label": "122.0517.115"
+  },
+  {
+    "catalog": "122.0477.876",
+    "material_text": "EOX 110-36 3 1/2\" I DRKV VUEL",
+    "label": "122.0150.683"
+  },
+  {
+    "catalog": "122.0477.875",
+    "material_text": "EOX 110-45 3 1/2\" I DRKV VUEL",
+    "label": "122.0070.175"
+  },
+  {
+    "catalog": "122.0477.874",
+    "material_text": "EOX 110-50/35 3 1/2\" I DRKV VUEL",
+    "label": "122.0051.933"
+  },
+  {
+    "catalog": "122.0477.873",
+    "material_text": "EOX 110-50/41 3 1/2\" I DRKV VUEL",
+    "label": "122.0174.480"
+  },
+  {
+    "catalog": "122.0375.283",
+    "material_text": "BXX 160-34-16 3 1/2\" I DRKV OT OLB",
+    "label": "122.0373.292"
+  },
+  {
+    "catalog": "122.0375.281",
+    "material_text": "BXX 160-34-16 3 1/2\" I SV OT OLB",
+    "label": "122.0373.292"
+  },
+  {
+    "catalog": "122.0375.276",
+    "material_text": "BXX 110-50 3 1/2\" I DRKV OT OLB",
+    "label": "122.0373.059"
+  },
+  {
+    "catalog": "122.0375.274",
+    "material_text": "BXX 110-50 3 1/2\" I SV OT OLB",
+    "label": "122.0373.059"
+  },
+  {
+    "catalog": "122.0375.260",
+    "material_text": "BXX 110-45 3 1/2\" I DRKV OT OLB",
+    "label": "122.0373.058"
+  },
+  {
+    "catalog": "122.0375.258",
+    "material_text": "BXX 110-45 3 1/2\" I SV OT OLB",
+    "label": "122.0373.058"
+  },
+  {
+    "catalog": "122.0375.255",
+    "material_text": "BXX 110-40 3 1/2\" I DRKV OT OLB",
+    "label": "122.0373.057"
+  },
+  {
+    "catalog": "122.0375.253",
+    "material_text": "BXX 110-40 3 1/2\" I SV OT OLB",
+    "label": "122.0373.057"
+  },
+  {
+    "catalog": "122.0374.690",
+    "material_text": "BXX 110-34 3 1/2\" I DRKV OT OLB",
+    "label": "122.0373.056"
+  },
+  {
+    "catalog": "122.0374.688",
+    "material_text": "BXX 110-34 3 1/2\" I SV OT OLB",
+    "label": "122.0373.056"
+  },
+  {
+    "catalog": "122.0374.685",
+    "material_text": "BXX 110-16 3 1/2\" I DRKV OT OLB",
+    "label": "122.0372.906"
+  },
+  {
+    "catalog": "122.0374.674",
+    "material_text": "BXX 110-16 3 1/2\" I SV OT OLB",
+    "label": "122.0372.906"
+  },
+  {
+    "catalog": "122.0197.997",
+    "material_text": "EOX 110-36 3 1/2\" I MAV SV",
+    "label": "122.0150.683"
+  },
+  {
+    "catalog": "122.0197.995",
+    "material_text": "EOX 110-45 3 1/2\" I MAV SV",
+    "label": "122.0070.175"
+  },
+  {
+    "catalog": "122.0197.993",
+    "material_text": "EOX 110-50/35 3 1/2\" I MAV SV",
+    "label": "122.0051.933"
+  },
+  {
+    "catalog": "122.0197.991",
+    "material_text": "EOX 110-50/41 3 1/2\" I MAV SV",
+    "label": "122.0174.480"
+  },
+  {
+    "catalog": "114.0747.296",
+    "material_text": "KNG PRO 610-73 3 1/2\" DRKV OT MBC ZUB",
+    "label": "114.0747.179"
+  },
+  {
+    "catalog": "114.0747.295",
+    "material_text": "KNG PRO 610-53 3 1/2\"A DRKV OT MBC ZUB",
+    "label": "114.0747.177"
+  },
+  {
+    "catalog": "114.0747.286",
+    "material_text": "KNG Pro 610-73 A 3 1/2\" DRUV OT OS ZUB",
+    "label": "114.0747.191"
+  },
+  {
+    "catalog": "114.0747.285",
+    "material_text": "KNG Pro 610-73 A 3 1/2\" DRUV OT GL ZUB",
+    "label": "114.0747.190"
+  },
+  {
+    "catalog": "114.0747.284",
+    "material_text": "KNG Pro 610-73 A 3 1/2\" DRUV OT ST ZUB",
+    "label": "114.0747.189"
+  },
+  {
+    "catalog": "114.0747.283",
+    "material_text": "KNG Pro 610-73 A 3 1/2\" DRUV OT SG ZUB",
+    "label": "114.0747.188"
+  },
+  {
+    "catalog": "114.0747.282",
+    "material_text": "KNG Pro 610-73 A 3 1/2\" DRUV OT ON ZUB",
+    "label": "114.0747.180"
+  },
+  {
+    "catalog": "114.0747.281",
+    "material_text": "KNG Pro 610-73 A 3 1/2\" DRUV OT MB ZUB",
+    "label": "114.0747.179"
+  },
+  {
+    "catalog": "114.0747.230",
+    "material_text": "KNG Pro 610-53 A 3 1/2\" DRUV OT OS ZUB",
+    "label": "114.0747.186"
+  },
+  {
+    "catalog": "114.0747.229",
+    "material_text": "KNG Pro610-53A 3 1/2\"DRKV OT VUEL GL ZUB",
+    "label": "114.0747.185"
+  },
+  {
+    "catalog": "114.0747.228",
+    "material_text": "KNG Pro 610-53 A 3 1/2\" DRUV OT ST ZUB",
+    "label": "114.0747.184"
+  },
+  {
+    "catalog": "114.0747.227",
+    "material_text": "KNG Pro 610-53 A 3 1/2\" DRUV OT SG ZUB",
+    "label": "114.0747.181"
+  },
+  {
+    "catalog": "114.0747.226",
+    "material_text": "KNG Pro 610-53 A 3 1/2\" DRUV OT MB ZUB",
+    "label": "114.0747.178"
+  },
+  {
+    "catalog": "114.0747.225",
+    "material_text": "KNG Pro 610-53 A 3 1/2\" DRUV OT MB ZUB",
+    "label": "114.0747.177"
+  },
+  {
+    "catalog": "114.0729.486",
+    "material_text": "MRG 610-60 CARE 3 1/2\" SV fA OT VUEL ST",
+    "label": "114.0722.261"
+  },
+  {
+    "catalog": "114.0729.485",
+    "material_text": "MRG 610-60 CARE 3 1/2\" SV fA OT VUEL PW",
+    "label": "114.0722.208"
+  },
+  {
+    "catalog": "114.0729.484",
+    "material_text": "MRG 610-60 CARE 3 1/2\" SV fA OT VUEL MB",
+    "label": "114.0722.210"
+  },
+  {
+    "catalog": "114.0725.058",
+    "material_text": "UBG 611-86 3 1/2''EXC REV MRU 2LB GSC SG",
+    "label": "114.0706.798"
+  },
+  {
+    "catalog": "114.0724.278",
+    "material_text": "CNG 611-62 A 3 1/2\" EXC TR MRU SG",
+    "label": "114.0706.695"
+  },
+  {
+    "catalog": "114.0724.277",
+    "material_text": "CNG 611-62 A 3 1/2\" EXC TL MRU SG",
+    "label": "114.0706.694"
+  },
+  {
+    "catalog": "114.0724.276",
+    "material_text": "UBG 611-100 3 1/2'EXC REV MRU 2LB GSC SG",
+    "label": "114.0706.794"
+  },
+  {
+    "catalog": "114.0723.992",
+    "material_text": "ROG 610-41 3 1/2\" MAV EXC OT SG",
+    "label": "114.0706.788"
+  },
+  {
+    "catalog": "114.0723.991",
+    "material_text": "CNG 611-78 A 3 1/2\" EXC TR MRU SG",
+    "label": "114.0706.698"
+  },
+  {
+    "catalog": "114.0723.990",
+    "material_text": "CNG 611-78 A 3 1/2\" EXC TL MUE SG",
+    "label": "114.0706.697"
+  },
+  {
+    "catalog": "114.0723.989",
+    "material_text": "STG 614-86 3 1/2\" MAV REV SV SG",
+    "label": "114.0706.790"
+  },
+  {
+    "catalog": "114.0723.988",
+    "material_text": "STG 651-86 3 1/2\" MAV REV SV AB SG",
+    "label": "114.0706.792"
+  },
+  {
+    "catalog": "114.0723.987",
+    "material_text": "STG 614-78 3 1/2\" MAV REV EXC SG",
+    "label": "114.0706.791"
+  },
+  {
+    "catalog": "114.0723.986",
+    "material_text": "STG 614-78 3 1/2\" MAV REV SV SG",
+    "label": "114.0706.791"
+  },
+  {
+    "catalog": "114.0723.985",
+    "material_text": "STG 651-86 3 1/2\" MAV REV EXC AB SG",
+    "label": "114.0706.792"
+  },
+  {
+    "catalog": "114.0723.984",
+    "material_text": "STG 614-86 3 1/2\" MAV REV EXC SG",
+    "label": "114.0706.790"
+  },
+  {
+    "catalog": "114.0723.983",
+    "material_text": "MRG 612-E 3 1/2\" DRKV MUE Schiefergrau",
+    "label": "114.0706.774"
+  },
+  {
+    "catalog": "114.0723.982",
+    "material_text": "MRG 611-62 3 1/2\" REV DRKV MUE SG",
+    "label": "114.0706.769"
+  },
+  {
+    "catalog": "114.0723.980",
+    "material_text": "MRG 611-78 3 1/2\" REV DRKV MUE SG",
+    "label": "114.0706.770"
+  },
+  {
+    "catalog": "114.0723.979",
+    "material_text": "MRG 611-97 XL 3 1/2\" REV DRKV MUE SG",
+    "label": "114.0706.773"
+  },
+  {
+    "catalog": "114.0723.978",
+    "material_text": "MRG 611-78 XL 3 1/2\" DRKV REV SG",
+    "label": "114.0706.771"
+  },
+  {
+    "catalog": "114.0723.976",
+    "material_text": "MRG 651-78 3 1/2\" REV DRKV MUE SG",
+    "label": "114.0706.776"
+  },
+  {
+    "catalog": "114.0723.975",
+    "material_text": "MRG 651-97 3 1/2\" REV DRKV MUE AB SG",
+    "label": "114.0706.775"
+  },
+  {
+    "catalog": "114.0723.973",
+    "material_text": "BFG 651 3 1/2\" EXC REV AB Schiefergrau",
+    "label": "114.0712.210"
+  },
+  {
+    "catalog": "114.0723.972",
+    "material_text": "BFG 620-86 3 1/2\" EXC MUE Schiefergrau",
+    "label": "114.0712.208"
+  },
+  {
+    "catalog": "114.0723.971",
+    "material_text": "UBG 651-100 3 1/2'EX REV MRU 2LB GSC SG",
+    "label": "114.0706.799"
+  },
+  {
+    "catalog": "114.0723.970",
+    "material_text": "UBG 611-78XL 3 1/2'EX REV MRU 2LBGSC SG",
+    "label": "114.0706.797"
+  },
+  {
+    "catalog": "114.0723.969",
+    "material_text": "UBG 611-78 3 1/2''EX REV MRU 2LB GSC SG",
+    "label": "114.0706.796"
+  },
+  {
+    "catalog": "114.0723.968",
+    "material_text": "UBG 611-62 3 1/2''EX REV MRU 2LB GSC SG",
+    "label": "114.0706.795"
+  },
+  {
+    "catalog": "114.0723.967",
+    "material_text": "AZG 651 3 1/2\" DKV REV MRU Schiefergrau",
+    "label": "114.0706.681"
+  },
+  {
+    "catalog": "114.0723.966",
+    "material_text": "UBG 610-56 3 1/2'' EXC OT MRU 2LB GSC SG",
+    "label": "114.0706.793"
+  },
+  {
+    "catalog": "114.0723.965",
+    "material_text": "ROG 610-41 3 1/2\" MAV SV OT Schiefergrau",
+    "label": "114.0706.788"
+  },
+  {
+    "catalog": "114.0723.964",
+    "material_text": "MTG 611 3 1/2\" DRKV MUE TR Schiefergrau",
+    "label": "114.0706.783"
+  },
+  {
+    "catalog": "114.0723.963",
+    "material_text": "MTG 611 3 1/2\" DRKV MUE TL Schiefergrau",
+    "label": "114.0706.781"
+  },
+  {
+    "catalog": "114.0723.962",
+    "material_text": "FSG 611-88 3 1/2\" DRKV REV VUEL SG",
+    "label": "114.0706.702"
+  },
+  {
+    "catalog": "114.0723.961",
+    "material_text": "BFG 651-78 3 1/2\" EXC REV AB SG",
+    "label": "114.0706.691"
+  },
+  {
+    "catalog": "114.0723.959",
+    "material_text": "BFG 611-86 3 1/2\" EXC REV MUE SG",
+    "label": "114.0706.687"
+  },
+  {
+    "catalog": "114.0723.958",
+    "material_text": "BFG 611 3 1/2\" EXC REV Schiefergrau",
+    "label": "114.0706.684"
+  },
+  {
+    "catalog": "114.0723.957",
+    "material_text": "BFG 611-62 3 1/2\" EXC REV MUE SG",
+    "label": "114.0706.683"
+  },
+  {
+    "catalog": "114.0723.956",
+    "material_text": "AZG 661-E 3 1/2\" DKV TL MRU Schiefergrau",
+    "label": "114.0706.682"
+  },
+  {
+    "catalog": "114.0723.954",
+    "material_text": "AZG 611-86 3 1/2\" DKV REV MRU SG",
+    "label": "114.0706.680"
+  },
+  {
+    "catalog": "114.0723.953",
+    "material_text": "AZG 611-78 3 1/2\" MAV EXC REV MRU SG",
+    "label": "114.0706.679"
+  },
+  {
+    "catalog": "114.0715.528",
+    "material_text": "MRG 610-39 A 3 1/2\" SV VUEL SG",
+    "label": "114.0706.742"
+  },
+  {
+    "catalog": "114.0715.527",
+    "material_text": "MRG 610-39 A 3 1/2\" DRKV VUEL SG",
+    "label": "114.0706.742"
+  },
+  {
+    "catalog": "114.0715.526",
+    "material_text": "MRG 610-54 A 3 1/2\" SV OT VUEL SG",
+    "label": "114.0706.835"
+  },
+  {
+    "catalog": "114.0715.525",
+    "material_text": "MRG 610-54 A 3 1/2\" DRKV OT VUEL SG",
+    "label": "114.0706.835"
+  },
+  {
+    "catalog": "114.0715.524",
+    "material_text": "MRG 610-73 A 3 1/2\" SV VUEL SG",
+    "label": "114.0706.836"
+  },
+  {
+    "catalog": "114.0715.523",
+    "material_text": "MRG 610-73 A 3 1/2\" DRKV VUEL SG",
+    "label": "114.0706.836"
+  },
+  {
+    "catalog": "114.0715.522",
+    "material_text": "MRG 610-37 A 3 1/2\" SV OT VUEL SG",
+    "label": "114.0706.741"
+  },
+  {
+    "catalog": "114.0715.521",
+    "material_text": "MRG 610-37 A 3 1/2\" DRKV OT VUEL SG",
+    "label": "114.0706.741"
+  },
+  {
+    "catalog": "114.0715.520",
+    "material_text": "MRG 610-52 A 3 1/2\" SV OT VUEL SG",
+    "label": "114.0706.745"
+  },
+  {
+    "catalog": "114.0715.519",
+    "material_text": "MRG 610-52 A 3 1/2\" DRKV OT VUEL SG",
+    "label": "114.0706.745"
+  },
+  {
+    "catalog": "114.0715.518",
+    "material_text": "MRG 610-72 A 3 1/2\" SV OT VUEL SG",
+    "label": "114.0706.768"
+  },
+  {
+    "catalog": "114.0715.517",
+    "material_text": "MRG 610-72 A 3 1/2\" DRKV OT VUEL SG",
+    "label": "114.0706.768"
+  },
+  {
+    "catalog": "114.0715.516",
+    "material_text": "MRG 611-97 3 1/2\" REV DRKV MUE SG",
+    "label": "114.0706.772"
+  },
+  {
+    "catalog": "114.0715.515",
+    "material_text": "CNG 611-62 3 1/2\" EXC REV VUEL SG",
+    "label": "114.0706.693"
+  },
+  {
+    "catalog": "114.0715.514",
+    "material_text": "CNG 611-78 3 1/2\" EXC REV VUEL SG",
+    "label": "114.0706.696"
+  },
+  {
+    "catalog": "114.0715.513",
+    "material_text": "CNG 611-86 3 1/2\" EXC REV VUEL GSC SG",
+    "label": "114.0706.699"
+  },
+  {
+    "catalog": "114.0715.512",
+    "material_text": "CNG 611-100 3 1/2\" EXC REV VUEL GSC SG",
+    "label": "114.0706.692"
+  },
+  {
+    "catalog": "114.0715.511",
+    "material_text": "CNG 651-100 3 1/2\" EXC REV VUEL GSC SG",
+    "label": "114.0706.837"
+  },
+  {
+    "catalog": "114.0709.463",
+    "material_text": "ROG 610-41 3 1/2\" EXC OT 2LB MRU MB",
+    "label": "114.0694.273"
+  },
+  {
+    "catalog": "114.0709.266",
+    "material_text": "AZG 661-E 3 1/2\" DKV TL MRU MB",
+    "label": "114.0697.791"
+  },
+  {
+    "catalog": "114.0708.267",
+    "material_text": "MRG 610-73 A 3 1/2\" SV VUEL OS",
+    "label": "114.0659.216"
+  },
+  {
+    "catalog": "114.0708.264",
+    "material_text": "MRG 610-73 A 3 1/2\" SV VUEL PW",
+    "label": "114.0659.213"
+  },
+  {
+    "catalog": "114.0708.262",
+    "material_text": "MRG 610-73 A 3 1/2\" SV VUEL MB",
+    "label": "114.0659.214"
+  },
+  {
+    "catalog": "114.0708.261",
+    "material_text": "MRG 610-73 A 3 1/2\" SV VUEL ST",
+    "label": "114.0659.217"
+  },
+  {
+    "catalog": "114.0708.258",
+    "material_text": "CNG 651-100 3 1/2\" EXC REV VUEL GSC OS",
+    "label": "114.0703.022"
+  },
+  {
+    "catalog": "114.0708.257",
+    "material_text": "CNG 651-100 3 1/2\" EXC REV VUEL GSC PW",
+    "label": "114.0703.024"
+  },
+  {
+    "catalog": "114.0708.256",
+    "material_text": "CNG 651-100 3 1/2\" EXC REV VUEL GSC MB",
+    "label": "114.0702.899"
+  },
+  {
+    "catalog": "114.0708.255",
+    "material_text": "CNG 651-100 3 1/2\" EXC REV VUEL GSC ST",
+    "label": "114.0703.025"
+  },
+  {
+    "catalog": "114.0708.254",
+    "material_text": "CNG 651-100 3 1/2\" EXC REV VUEL GSC ON",
+    "label": "114.0703.021"
+  },
+  {
+    "catalog": "114.0708.230",
+    "material_text": "MRG 610-73 A 3 1/2\" SV VUEL ON",
+    "label": "114.0659.218"
+  },
+  {
+    "catalog": "114.0708.229",
+    "material_text": "MRG 610-73 A 3 1/2\" EXC VUEL MBC",
+    "label": "114.0659.214"
+  },
+  {
+    "catalog": "114.0708.228",
+    "material_text": "MRG 610-73 A 3 1/2\" SV VUEL MBC",
+    "label": "114.0659.214"
+  },
+  {
+    "catalog": "114.0708.227",
+    "material_text": "MRG 610-73 A 3 1/2\" DRKV VUEL OS",
+    "label": "114.0659.216"
+  },
+  {
+    "catalog": "114.0708.226",
+    "material_text": "MRG 610-73 A 3 1/2\" DRKV VUEL PW",
+    "label": "114.0659.213"
+  },
+  {
+    "catalog": "114.0708.225",
+    "material_text": "MRG 610-73 A 3 1/2\" DRKV VUEL MB",
+    "label": "114.0659.214"
+  },
+  {
+    "catalog": "114.0708.224",
+    "material_text": "MRG 610-73 A 3 1/2\" DRKV VUEL ST",
+    "label": "114.0659.217"
+  },
+  {
+    "catalog": "114.0708.223",
+    "material_text": "MRG 610-73 A 3 1/2\" DRKV VUEL ON",
+    "label": "114.0659.218"
+  },
+  {
+    "catalog": "114.0708.045",
+    "material_text": "MRG 610-54 A 3 1/2\" SV VUEL OS",
+    "label": "114.0659.208"
+  },
+  {
+    "catalog": "114.0708.044",
+    "material_text": "MRG 610-54 A 3 1/2\" SV OT VUEL PW",
+    "label": "114.0659.205"
+  },
+  {
+    "catalog": "114.0708.043",
+    "material_text": "MRG 610-54 A 3 1/2\" EXC VUEL MBC",
+    "label": "114.0659.206"
+  },
+  {
+    "catalog": "114.0708.042",
+    "material_text": "MRG 610-54 A 3 1/2\" SV OT VUEL MBC",
+    "label": "114.0659.206"
+  },
+  {
+    "catalog": "114.0708.041",
+    "material_text": "MRG 610-54 A 3 1/2\" DRKV OT VUEL OS",
+    "label": "114.0659.208"
+  },
+  {
+    "catalog": "114.0708.040",
+    "material_text": "MRG 610-54 A 3 1/2\" DRKV OT VUEL PW",
+    "label": "114.0659.205"
+  },
+  {
+    "catalog": "114.0708.039",
+    "material_text": "MRG 610-39 A 3 1/2\" SV VUEL OS",
+    "label": "114.0659.198"
+  },
+  {
+    "catalog": "114.0708.038",
+    "material_text": "MRG 610-39 A 3 1/2\" SV VUEL PW",
+    "label": "114.0659.195"
+  },
+  {
+    "catalog": "114.0708.036",
+    "material_text": "MRG 610-39 A 3 1/2\" EXC VUEL MBC",
+    "label": "114.0659.196"
+  },
+  {
+    "catalog": "114.0708.035",
+    "material_text": "MRG 610-39 A 3 1/2\" SV VUEL MBC",
+    "label": "114.0659.196"
+  },
+  {
+    "catalog": "114.0708.034",
+    "material_text": "MRG 610-39 A 3 1/2\" DRKV VUEL OS",
+    "label": "114.0659.198"
+  },
+  {
+    "catalog": "114.0708.033",
+    "material_text": "MRG 610-39 A 3 1/2\" DRKV VUEL PW",
+    "label": "114.0659.195"
+  },
+  {
+    "catalog": "114.0700.628",
+    "material_text": "ROG 610-41 3 1/2\" SV OT MRU MB",
+    "label": "114.0694.273"
+  },
+  {
+    "catalog": "114.0685.109",
+    "material_text": "CNG 611-62 A 3 1/2\" EXC TR MRU OS",
+    "label": "114.0621.102"
+  },
+  {
+    "catalog": "114.0685.108",
+    "material_text": "CNG 611-62 A 3 1/2\" EXC TL MRU OS",
+    "label": "114.0621.085"
+  },
+  {
+    "catalog": "114.0685.107",
+    "material_text": "CNG 611-62 A 3 1/2\" EXC TR MRU PW",
+    "label": "114.0621.098"
+  },
+  {
+    "catalog": "114.0685.106",
+    "material_text": "CNG 611-62 A 3 1/2\" EXC TL MRU PW",
+    "label": "114.0621.070"
+  },
+  {
+    "catalog": "114.0685.105",
+    "material_text": "CNG 611-78 A 3 1/2\" EXC TR MRU OS",
+    "label": "114.0621.158"
+  },
+  {
+    "catalog": "114.0685.104",
+    "material_text": "CNG 611-78 A 3 1/2\" EXC TL MUE OS",
+    "label": "114.0621.144"
+  },
+  {
+    "catalog": "114.0685.103",
+    "material_text": "CNG 611-78 A 3 1/2\" EXC TR MRU PW",
+    "label": "114.0621.154"
+  },
+  {
+    "catalog": "114.0685.102",
+    "material_text": "CNG 611-78 A 3 1/2\" EXC TL MUE PW",
+    "label": "114.0621.130"
+  },
+  {
+    "catalog": "114.0682.738",
+    "material_text": "UBG 610-56 3 1/2'' EXC OT MRU 2L GSC MBC",
+    "label": "114.0680.389"
+  },
+  {
+    "catalog": "114.0682.737",
+    "material_text": "UBG 611-78XL 3 1/2'EXC REV MRU 2LGSC MBC",
+    "label": "114.0680.431"
+  },
+  {
+    "catalog": "114.0682.736",
+    "material_text": "UBG 611-78 3 1/2''EXC REV MRU 2L GSC MBC",
+    "label": "114.0680.424"
+  },
+  {
+    "catalog": "114.0682.735",
+    "material_text": "UBG 611-62 3 1/2''EXC REV MRU 2L GSC MBC",
+    "label": "114.0680.417"
+  },
+  {
+    "catalog": "114.0682.734",
+    "material_text": "UBG 651-100 3 1/2'EXC REV MRU 2L GSC MBC",
+    "label": "114.0680.469"
+  },
+  {
+    "catalog": "114.0682.733",
+    "material_text": "UBG 611-100 3 1/2'EXC REV MRU 2L GSC MBC",
+    "label": "114.0680.455"
+  },
+  {
+    "catalog": "114.0682.732",
+    "material_text": "UBG 611-86 3 1/2''EXC REV MRU 2L GSC MBC",
+    "label": "114.0680.438"
+  },
+  {
+    "catalog": "114.0682.644",
+    "material_text": "UBG 610-56 3 1/2'' EXC OT MRU 2LB GSC ON",
+    "label": "114.0680.393"
+  },
+  {
+    "catalog": "114.0682.643",
+    "material_text": "UBG 610-56 3 1/2'' EXC OT MRU 2LB GSC ST",
+    "label": "114.0680.392"
+  },
+  {
+    "catalog": "114.0682.642",
+    "material_text": "UBG 610-56 3 1/2'' EXC OT MRU 2LB GSC OS",
+    "label": "114.0680.391"
+  },
+  {
+    "catalog": "114.0682.641",
+    "material_text": "UBG 610-56 3 1/2'' EXC OT MRU 2LB GSC MB",
+    "label": "114.0680.389"
+  },
+  {
+    "catalog": "114.0682.600",
+    "material_text": "UBG 610-56 3 1/2'' EXC OT MRU 2LB GSC PW",
+    "label": "114.0680.306"
+  },
+  {
+    "catalog": "114.0682.570",
+    "material_text": "UBG 611-78XL 3 1/2'EXC REV MRU 2LBGSC ON",
+    "label": "114.0680.435"
+  },
+  {
+    "catalog": "114.0682.569",
+    "material_text": "UBG 611-78XL 3 1/2'EXC REV MRU 2LBGSC ST",
+    "label": "114.0680.434"
+  },
+  {
+    "catalog": "114.0682.567",
+    "material_text": "UBG 611-78XL 3 1/2'EXC REV MRU 2LBGSC OS",
+    "label": "114.0680.433"
+  },
+  {
+    "catalog": "114.0682.566",
+    "material_text": "UBG 611-78XL 3 1/2'EXC REV MRU 2LBGSC MB",
+    "label": "114.0680.431"
+  },
+  {
+    "catalog": "114.0682.565",
+    "material_text": "UBG 611-78XL 3 1/2'EXC REV MRU 2LBGSC PW",
+    "label": "114.0680.342"
+  },
+  {
+    "catalog": "114.0682.564",
+    "material_text": "UBG 611-78 3 1/2''EXC REV MRU 2LB GSC ON",
+    "label": "114.0680.428"
+  },
+  {
+    "catalog": "114.0682.563",
+    "material_text": "UBG 611-78 3 1/2''EXC REV MRU 2LB GSC ST",
+    "label": "114.0680.427"
+  },
+  {
+    "catalog": "114.0682.562",
+    "material_text": "UBG 611-78 3 1/2''EXC REV MRU 2LB GSC OS",
+    "label": "114.0680.426"
+  },
+  {
+    "catalog": "114.0682.561",
+    "material_text": "UBG 611-78 3 1/2''EXC REV MRU 2LB GSC MB",
+    "label": "114.0680.424"
+  },
+  {
+    "catalog": "114.0682.550",
+    "material_text": "UBG 611-78 3 1/2''EXC REV MRU 2LB GSC PW",
+    "label": "114.0680.341"
+  },
+  {
+    "catalog": "114.0682.549",
+    "material_text": "UBG 611-62 3 1/2''EXC REV MRU 2LB GSC ON",
+    "label": "114.0680.421"
+  },
+  {
+    "catalog": "114.0682.548",
+    "material_text": "UBG 611-62 3 1/2''EXC REV MRU 2LB GSC ST",
+    "label": "114.0680.420"
+  },
+  {
+    "catalog": "114.0682.547",
+    "material_text": "UBG 611-62 3 1/2''EXC REV MRU 2LB GSC OS",
+    "label": "114.0680.419"
+  },
+  {
+    "catalog": "114.0682.546",
+    "material_text": "UBG 611-62 3 1/2''EXC REV MRU 2LB GSC MB",
+    "label": "114.0680.417"
+  },
+  {
+    "catalog": "114.0682.545",
+    "material_text": "UBG 611-62 3 1/2''EXC REV MRU 2LB GSC PW",
+    "label": "114.0680.310"
+  },
+  {
+    "catalog": "114.0682.534",
+    "material_text": "UBG 651-100 3 1/2'EXC REV MRU 2LB GSC ON",
+    "label": "114.0680.473"
+  },
+  {
+    "catalog": "114.0682.533",
+    "material_text": "UBG 651-100 3 1/2'EXC REV MRU 2LB GSC ST",
+    "label": "114.0680.472"
+  },
+  {
+    "catalog": "114.0682.532",
+    "material_text": "UBG 651-100 3 1/2'EXC REV MRU 2LB GSC OS",
+    "label": "114.0680.471"
+  },
+  {
+    "catalog": "114.0682.531",
+    "material_text": "UBG 651-100 3 1/2'EXC REV MRU 2LB GSC MB",
+    "label": "114.0680.469"
+  },
+  {
+    "catalog": "114.0682.530",
+    "material_text": "UBG 611-100 3 1/2'EXC REV MRU 2LB GSC ON",
+    "label": "114.0680.459"
+  },
+  {
+    "catalog": "114.0682.529",
+    "material_text": "UBG 611-100 3 1/2'EXC REV MRU 2LB GSC ST",
+    "label": "114.0680.458"
+  },
+  {
+    "catalog": "114.0682.528",
+    "material_text": "UBG 611-100 3 1/2'EXC REV MRU 2LB GSC OS",
+    "label": "114.0680.457"
+  },
+  {
+    "catalog": "114.0682.527",
+    "material_text": "UBG 611-100 3 1/2'EXC REV MRU 2LB GSC MB",
+    "label": "114.0680.455"
+  },
+  {
+    "catalog": "114.0682.526",
+    "material_text": "UBG 651-100 3 1/2'EXC REV MRU 2LB GSC PW",
+    "label": "114.0680.382"
+  },
+  {
+    "catalog": "114.0682.525",
+    "material_text": "UBG 611-100 3 1/2'EXC REV MRU 2LB GSC PW",
+    "label": "114.0680.380"
+  },
+  {
+    "catalog": "114.0682.524",
+    "material_text": "UBG 611-86 3 1/2''EXC REV MRU 2LB GSC ON",
+    "label": "114.0680.452"
+  },
+  {
+    "catalog": "114.0682.523",
+    "material_text": "UBG 611-86 3 1/2''EXC REV MRU 2LB GSC ST",
+    "label": "114.0680.451"
+  },
+  {
+    "catalog": "114.0682.522",
+    "material_text": "UBG 611-86 3 1/2''EXC REV MRU 2LB GSC OS",
+    "label": "114.0680.440"
+  },
+  {
+    "catalog": "114.0682.521",
+    "material_text": "UBG 611-86 3 1/2''EXC REV MRU 2LB GSC MB",
+    "label": "114.0680.438"
+  },
+  {
+    "catalog": "114.0682.510",
+    "material_text": "UBG 611-86 3 1/2''EXC REV MRU 2LB GSC PW",
+    "label": "114.0680.378"
+  },
+  {
+    "catalog": "114.0682.507",
+    "material_text": "CNG 611-100 3 1/2\" EXC REV VUEL GSC OS",
+    "label": "114.0680.513"
+  },
+  {
+    "catalog": "114.0682.506",
+    "material_text": "CNG 611-100 3 1/2\" EXC REV VUEL GSC PW",
+    "label": "114.0680.388"
+  },
+  {
+    "catalog": "114.0682.505",
+    "material_text": "CNG 611-100 3 1/2\" EXC REV VUEL GSC MB",
+    "label": "114.0680.511"
+  },
+  {
+    "catalog": "114.0682.504",
+    "material_text": "CNG 611-100 3 1/2\" EXC REV VUEL GSC ST",
+    "label": "114.0680.514"
+  },
+  {
+    "catalog": "114.0682.503",
+    "material_text": "CNG 611-100 3 1/2\" EXC REV VUEL GSC ON",
+    "label": "114.0680.515"
+  },
+  {
+    "catalog": "114.0682.502",
+    "material_text": "CNG 611-86 3 1/2\" EXC REV VUEL GSC OS",
+    "label": "114.0680.506"
+  },
+  {
+    "catalog": "114.0682.501",
+    "material_text": "CNG 611-86 3 1/2\" EXC REV VUEL GSC PW",
+    "label": "114.0680.387"
+  },
+  {
+    "catalog": "114.0682.460",
+    "material_text": "CNG 611-86 3 1/2\" EXC REV VUEL GSC MB",
+    "label": "114.0680.504"
+  },
+  {
+    "catalog": "114.0682.459",
+    "material_text": "CNG 611-86 3 1/2\" EXC REV VUEL GSC ST",
+    "label": "114.0680.507"
+  },
+  {
+    "catalog": "114.0682.458",
+    "material_text": "CNG 611-86 3 1/2\" EXC REV VUEL GSC ON",
+    "label": "114.0680.508"
+  },
+  {
+    "catalog": "114.0681.586",
+    "material_text": "CNG 611-78 3 1/2\" EXC REV VUEL OS",
+    "label": "114.0680.492"
+  },
+  {
+    "catalog": "114.0681.585",
+    "material_text": "CNG 611-78 3 1/2\" EXC REV VUEL PW",
+    "label": "114.0680.385"
+  },
+  {
+    "catalog": "114.0681.584",
+    "material_text": "CNG 611-78 3 1/2\" EXC REV VUEL MB",
+    "label": "114.0680.490"
+  },
+  {
+    "catalog": "114.0681.583",
+    "material_text": "CNG 611-78 3 1/2\" EXC REV VUEL ST",
+    "label": "114.0680.493"
+  },
+  {
+    "catalog": "114.0681.581",
+    "material_text": "CNG 611-78 3 1/2\" EXC REV VUEL ON",
+    "label": "114.0680.494"
+  },
+  {
+    "catalog": "114.0681.430",
+    "material_text": "CNG 611-62 3 1/2\" EXC REV VUEL OS",
+    "label": "114.0680.485"
+  },
+  {
+    "catalog": "114.0681.429",
+    "material_text": "CNG 611-62 3 1/2\" EXC REV VUEL PW",
+    "label": "114.0680.384"
+  },
+  {
+    "catalog": "114.0681.428",
+    "material_text": "CNG 611-62 3 1/2\" EXC REV VUEL MB",
+    "label": "114.0680.483"
+  },
+  {
+    "catalog": "114.0681.427",
+    "material_text": "CNG 611-62 3 1/2\" EXC REV VUEL ST",
+    "label": "114.0680.486"
+  },
+  {
+    "catalog": "114.0681.426",
+    "material_text": "CNG 611-62 3 1/2\" EXC REV VUEL ON",
+    "label": "114.0680.487"
+  },
+  {
+    "catalog": "114.0659.125",
+    "material_text": "MRG 610-72 A 3 1/2\" EXC OT VUEL MBC",
+    "label": "114.0655.200"
+  },
+  {
+    "catalog": "114.0659.124",
+    "material_text": "MRG 610-52 A 3 1/2\" EXC OT VUEL MBC",
+    "label": "114.0655.071"
+  },
+  {
+    "catalog": "114.0659.123",
+    "material_text": "MRG 610-37 A 3 1/2\" EXC OT VUEL MBC",
+    "label": "114.0655.208"
+  },
+  {
+    "catalog": "114.0658.595",
+    "material_text": "CNG 611-62 A 3 1/2\" EXC TL MRU MBC",
+    "label": "114.0621.082"
+  },
+  {
+    "catalog": "114.0658.594",
+    "material_text": "CNG 611-62 A 3 1/2\" EXC TR MRU MBC",
+    "label": "114.0621.099"
+  },
+  {
+    "catalog": "114.0658.593",
+    "material_text": "CNG 611-78 A 3 1/2\" EXC TL MRU MBC",
+    "label": "114.0621.141"
+  },
+  {
+    "catalog": "114.0658.592",
+    "material_text": "CNG 611-78 A 3 1/2\" EXC TR MRU MBC",
+    "label": "114.0621.155"
+  },
+  {
+    "catalog": "114.0658.588",
+    "material_text": "MRG 610-72 A 3 1/2\" SV OT VUEL MBC",
+    "label": "114.0655.200"
+  },
+  {
+    "catalog": "114.0658.586",
+    "material_text": "MRG 610-52 A 3 1/2\" SV OT VUEL MBC",
+    "label": "114.0655.071"
+  },
+  {
+    "catalog": "114.0658.583",
+    "material_text": "MRG 610-37 A 3 1/2\" SV OT VUEL MBC",
+    "label": "114.0655.208"
+  },
+  {
+    "catalog": "114.0658.498",
+    "material_text": "MRG 610-54 A 3 1/2\" SV OT VUEL ST",
+    "label": "114.0659.209"
+  },
+  {
+    "catalog": "114.0658.497",
+    "material_text": "MRG 610-54 A 3 1/2\" SV OT VUEL ON",
+    "label": "114.0659.210"
+  },
+  {
+    "catalog": "114.0658.496",
+    "material_text": "MRG 610-54 A 3 1/2\" SV OT VUEL MB",
+    "label": "114.0659.206"
+  },
+  {
+    "catalog": "114.0658.495",
+    "material_text": "MRG 610-54 A 3 1/2\" DRKV OT VUEL ST",
+    "label": "114.0659.209"
+  },
+  {
+    "catalog": "114.0658.494",
+    "material_text": "MRG 610-54 A 3 1/2\" DRKV OT VUEL ON",
+    "label": "114.0659.210"
+  },
+  {
+    "catalog": "114.0658.493",
+    "material_text": "MRG 610-54 A 3 1/2\" DRKV OT VUEL MB",
+    "label": "114.0659.206"
+  },
+  {
+    "catalog": "114.0658.492",
+    "material_text": "MRG 610-39 A 3 1/2\" SV VUEL ST",
+    "label": "114.0659.199"
+  },
+  {
+    "catalog": "114.0658.491",
+    "material_text": "MRG 610-39 A 3 1/2\" SV VUEL ON",
+    "label": "114.0659.200"
+  },
+  {
+    "catalog": "114.0658.420",
+    "material_text": "MRG 610-39 A 3 1/2\" SV VUEL MB",
+    "label": "114.0659.196"
+  },
+  {
+    "catalog": "114.0658.419",
+    "material_text": "MRG 610-39 A 3 1/2\" DRKV VUEL ST",
+    "label": "114.0659.199"
+  },
+  {
+    "catalog": "114.0658.418",
+    "material_text": "MRG 610-39 A 3 1/2\" DRKV VUEL ON",
+    "label": "114.0659.200"
+  },
+  {
+    "catalog": "114.0658.417",
+    "material_text": "MRG 610-39 A 3 1/2\" DRKV VUEL MB",
+    "label": "114.0659.196"
+  },
+  {
+    "catalog": "114.0658.334",
+    "material_text": "MRG 610-72 A 3 1/2\" SV OT VUEL OS",
+    "label": "114.0655.206"
+  },
+  {
+    "catalog": "114.0658.333",
+    "material_text": "MRG 610-72 A 3 1/2\" SV OT VUEL PW",
+    "label": "114.0655.204"
+  },
+  {
+    "catalog": "114.0658.332",
+    "material_text": "MRG 610-72 A 3 1/2\" SV OT VUEL ST",
+    "label": "114.0655.202"
+  },
+  {
+    "catalog": "114.0658.331",
+    "material_text": "MRG 610-72 A 3 1/2\" SV OT VUEL MB",
+    "label": "114.0655.200"
+  },
+  {
+    "catalog": "114.0658.310",
+    "material_text": "MRG 610-72 A 3 1/2\" SV OT VUEL ON",
+    "label": "114.0655.201"
+  },
+  {
+    "catalog": "114.0658.309",
+    "material_text": "MRG 610-72 A 3 1/2\" DRKV OT VUEL OS",
+    "label": "114.0655.206"
+  },
+  {
+    "catalog": "114.0658.308",
+    "material_text": "MRG 610-72 A 3 1/2\" DRKV OT VUEL PW",
+    "label": "114.0655.204"
+  },
+  {
+    "catalog": "114.0658.306",
+    "material_text": "MRG 610-72 A 3 1/2\" DRKV OT VUEL ST",
+    "label": "114.0655.202"
+  },
+  {
+    "catalog": "114.0658.305",
+    "material_text": "MRG 610-72 A 3 1/2\" DRKV OT VUEL MB",
+    "label": "114.0655.200"
+  },
+  {
+    "catalog": "114.0658.303",
+    "material_text": "MRG 610-72 A 3 1/2\" DRKV OT VUEL ON",
+    "label": "114.0655.201"
+  },
+  {
+    "catalog": "114.0658.302",
+    "material_text": "MRG 610-52 A 3 1/2\" SV OT VUEL OS",
+    "label": "114.0655.079"
+  },
+  {
+    "catalog": "114.0658.301",
+    "material_text": "MRG 610-52 A 3 1/2\" SV OT VUEL PW",
+    "label": "114.0655.077"
+  },
+  {
+    "catalog": "114.0658.300",
+    "material_text": "MRG 610-52 A 3 1/2\" SV OT VUEL ST",
+    "label": "114.0655.075"
+  },
+  {
+    "catalog": "114.0658.299",
+    "material_text": "MRG 610-52 A 3 1/2\" SV OT VUEL MB",
+    "label": "114.0655.071"
+  },
+  {
+    "catalog": "114.0658.298",
+    "material_text": "MRG 610-52 A 3 1/2\" SV OT VUEL ON",
+    "label": "114.0655.074"
+  },
+  {
+    "catalog": "114.0658.297",
+    "material_text": "MRG 610-52 A 3 1/2\" DRKV OT VUEL Cashmer",
+    "label": "114.0655.079"
+  },
+  {
+    "catalog": "114.0658.296",
+    "material_text": "MRG 610-52 A 3 1/2\" DRKV OT VUEL PW",
+    "label": "114.0655.077"
+  },
+  {
+    "catalog": "114.0658.295",
+    "material_text": "MRG 610-52 A 3 1/2\" DRKV OT VUEL ST",
+    "label": "114.0655.075"
+  },
+  {
+    "catalog": "114.0658.294",
+    "material_text": "MRG 610-52 A 3 1/2\" DRKV OT VUEL MB",
+    "label": "114.0655.071"
+  },
+  {
+    "catalog": "114.0658.293",
+    "material_text": "MRG 610-52 A 3 1/2\" DRKV OT VUEL ON",
+    "label": "114.0655.074"
+  },
+  {
+    "catalog": "114.0658.257",
+    "material_text": "MRG 610-37 A 3 1/2\" DRKV OT VUEL Cashmer",
+    "label": "114.0655.219"
+  },
+  {
+    "catalog": "114.0658.256",
+    "material_text": "MRG 610-37 A 3 1/2\" DRKV OT VUEL PW",
+    "label": "114.0655.217"
+  },
+  {
+    "catalog": "114.0658.255",
+    "material_text": "MRG 610-37 A 3 1/2\" DRKV OT VUEL ST",
+    "label": "114.0655.213"
+  },
+  {
+    "catalog": "114.0658.254",
+    "material_text": "MRG 610-37 A 3 1/2\" DRKV OT VUEL MB",
+    "label": "114.0655.208"
+  },
+  {
+    "catalog": "114.0658.220",
+    "material_text": "MRG 610-37 A 3 1/2\" SV OT VUEL Cashmere",
+    "label": "114.0655.219"
+  },
+  {
+    "catalog": "114.0658.219",
+    "material_text": "MRG 610-37 A 3 1/2\" SV OT VUEL PW",
+    "label": "114.0655.217"
+  },
+  {
+    "catalog": "114.0658.218",
+    "material_text": "MRG 610-37 A 3 1/2\" SV OT VUEL ST",
+    "label": "114.0655.213"
+  },
+  {
+    "catalog": "114.0658.217",
+    "material_text": "MRG 610-37 A 3 1/2\" SV OT VUEL MB",
+    "label": "114.0655.208"
+  },
+  {
+    "catalog": "114.0658.216",
+    "material_text": "MRG 610-37 A 3 1/2\" SV OT VUEL ON",
+    "label": "114.0655.209"
+  },
+  {
+    "catalog": "114.0658.140",
+    "material_text": "MRG 610-37 A 3 1/2\" DRKV OT VUEL ON",
+    "label": "114.0655.209"
+  },
+  {
+    "catalog": "114.0657.829",
+    "material_text": "STG 614-78 3 1/2\" EXC REV MUE MB",
+    "label": "114.0656.783"
+  },
+  {
+    "catalog": "114.0657.828",
+    "material_text": "STG 614-78 3 1/2\" MAV REV SV MB",
+    "label": "114.0656.783"
+  },
+  {
+    "catalog": "114.0657.827",
+    "material_text": "STG 614-86 3 1/2\" MAV REV EXC MB",
+    "label": "114.0656.782"
+  },
+  {
+    "catalog": "114.0657.826",
+    "material_text": "STG 614-86 3 1/2\" MAV REV SV MB",
+    "label": "114.0656.782"
+  },
+  {
+    "catalog": "114.0657.825",
+    "material_text": "STG 651-86 3 1/2\" MAV REV EXC AB MB",
+    "label": "114.0656.784"
+  },
+  {
+    "catalog": "114.0657.824",
+    "material_text": "STG 651-86 3 1/2\" MAV REV SV AB MB",
+    "label": "114.0656.784"
+  },
+  {
+    "catalog": "114.0657.823",
+    "material_text": "BFG 620-86 3 1/2\" EXC MUE MB",
+    "label": "114.0656.718"
+  },
+  {
+    "catalog": "114.0657.822",
+    "material_text": "BFG 611-78 3 1/2\" EXC REV MB",
+    "label": "114.0656.716"
+  },
+  {
+    "catalog": "114.0657.810",
+    "material_text": "BFG 611-62 3 1/2\" EXC REV MUE MB",
+    "label": "114.0656.713"
+  },
+  {
+    "catalog": "114.0657.809",
+    "material_text": "BFG 611-86 3 1/2\" EXC REV MUE MB",
+    "label": "114.0656.715"
+  },
+  {
+    "catalog": "114.0657.808",
+    "material_text": "BFG 651-78 3 1/2\" EXC REV AB MB",
+    "label": "114.0656.765"
+  },
+  {
+    "catalog": "114.0657.807",
+    "material_text": "BFG 651 3 1/2\" EXC REV AB MB",
+    "label": "114.0656.761"
+  },
+  {
+    "catalog": "114.0657.806",
+    "material_text": "AZG 611-78 3 1/2\" MAV EXC REV MRU MB",
+    "label": "114.0656.585"
+  },
+  {
+    "catalog": "114.0657.805",
+    "material_text": "AZG 611-86 3 1/2\" DKV REV MRU MB",
+    "label": "114.0656.584"
+  },
+  {
+    "catalog": "114.0657.804",
+    "material_text": "AZG 651-97 3 1/2\" DKV REV MRU MB",
+    "label": "114.0656.712"
+  },
+  {
+    "catalog": "114.0627.675",
+    "material_text": "CNG 611-78 A 3 1/2\" EXC TR MRU ST",
+    "label": "114.0621.171"
+  },
+  {
+    "catalog": "114.0627.674",
+    "material_text": "CNG 611-78 A 3 1/2\" EXC TL MUE ST",
+    "label": "114.0621.147"
+  },
+  {
+    "catalog": "114.0627.672",
+    "material_text": "CNG 611-62 A 3 1/2\" EXC TR MRU ST",
+    "label": "114.0621.106"
+  },
+  {
+    "catalog": "114.0627.671",
+    "material_text": "CNG 611-62 A 3 1/2\" EXC TL MRU ST",
+    "label": "114.0621.088"
+  },
+  {
+    "catalog": "114.0627.658",
+    "material_text": "CNG 611-78 A 3 1/2\" EXC TR MRU ON",
+    "label": "114.0621.173"
+  },
+  {
+    "catalog": "114.0627.657",
+    "material_text": "CNG 611-78 A 3 1/2\" EXC TL MUE ON",
+    "label": "114.0621.149"
+  },
+  {
+    "catalog": "114.0627.656",
+    "material_text": "CNG 611-62 A 3 1/2\" EXC TR MRU ON",
+    "label": "114.0621.109"
+  },
+  {
+    "catalog": "114.0627.655",
+    "material_text": "CNG 611-62 A 3 1/2\" EXC TL MRU ON",
+    "label": "114.0621.091"
+  },
+  {
+    "catalog": "114.0627.651",
+    "material_text": "CNG 611-78 A 3 1/2\" EXC TR MUE MB",
+    "label": "114.0621.155"
+  },
+  {
+    "catalog": "114.0627.620",
+    "material_text": "CNG 611-78 A 3 1/2\" EXC TL MUE BM",
+    "label": "114.0621.141"
+  },
+  {
+    "catalog": "114.0627.619",
+    "material_text": "CNG 611-62 A 3 1/2\" EXC TR MUE BM",
+    "label": "114.0621.099"
+  },
+  {
+    "catalog": "114.0627.618",
+    "material_text": "CNG 611-62 A 3 1/2\" EXC TL MUE BM",
+    "label": "114.0621.082"
+  },
+  {
+    "catalog": "114.0627.371",
+    "material_text": "MRG 612-E 3 1/2\" DRKV MUE BM",
+    "label": "114.0627.052"
+  },
+  {
+    "catalog": "114.0627.368",
+    "material_text": "MRG 611-62 3 1/2\" REV DRKV MUE BM",
+    "label": "114.0627.053"
+  },
+  {
+    "catalog": "114.0627.366",
+    "material_text": "MRG 611-78 3 1/2\" REV DRKV MUE BM",
+    "label": "114.0627.059"
+  },
+  {
+    "catalog": "114.0627.364",
+    "material_text": "MRG 611-78 XL 3 1/2\" DRKV REV BM",
+    "label": "114.0627.054"
+  },
+  {
+    "catalog": "114.0627.362",
+    "material_text": "MRG 611-97 XL 3 1/2\" REV DRKV MUE BM",
+    "label": "114.0627.060"
+  },
+  {
+    "catalog": "114.0627.323",
+    "material_text": "FSG 611-88 3 1/2\" DRKV REV VUEL MB",
+    "label": "114.0626.821"
+  },
+  {
+    "catalog": "114.0627.290",
+    "material_text": "MRG 611-97 3 1/2\" DRKV REV MUE BM",
+    "label": "114.0627.056"
+  },
+  {
+    "catalog": "114.0627.287",
+    "material_text": "MRG 651-78 3 1/2\" REV DRKV MUE BM",
+    "label": "114.0627.067"
+  },
+  {
+    "catalog": "114.0627.285",
+    "material_text": "MRG 651-97 3 1/2\" DRKV REV MUE AB BM",
+    "label": "114.0627.066"
+  },
+  {
+    "catalog": "114.0593.108",
+    "material_text": "FSG 611-88 3 1/2\" DRKV REV VUEL ON",
+    "label": "114.0593.018"
+  },
+  {
+    "catalog": "114.0512.158",
+    "material_text": "AZG 611-78 3 1/2\" MAV EXC REV MRU Steing",
+    "label": "114.0492.429"
+  },
+  {
+    "catalog": "114.0512.153",
+    "material_text": "AZG 611-78 3 1/2\" MAV EXC REV MRU Cashme",
+    "label": "114.0492.426"
+  },
+  {
+    "catalog": "114.0512.152",
+    "material_text": "AZG 611-78 3 1/2\" MAV EXC REV MRU Glacie",
+    "label": "114.0492.428"
+  },
+  {
+    "catalog": "114.0512.151",
+    "material_text": "AZG 611-78 3 1/2\" MAV EXC REV MRU Onyx",
+    "label": "114.0492.425"
+  },
+  {
+    "catalog": "114.0477.993",
+    "material_text": "AZG 661-E 3 1/2\" DKV TL MRU Steingrau",
+    "label": "114.0474.968"
+  },
+  {
+    "catalog": "114.0477.992",
+    "material_text": "AZG 661-E 3 1/2\" DKV TL MRU Glacier",
+    "label": "114.0474.967"
+  },
+  {
+    "catalog": "114.0477.991",
+    "material_text": "AZG 661-E 3 1/2\" DKV TL MRU Cashmere",
+    "label": "114.0474.965"
+  },
+  {
+    "catalog": "114.0477.990",
+    "material_text": "AZG 661-E 3 1/2\" DKV TL MRU Onyx",
+    "label": "114.0474.964"
+  },
+  {
+    "catalog": "114.0477.981",
+    "material_text": "AZG 611-86 3 1/2\" DKV REV MRU Steingrau",
+    "label": "114.0470.458"
+  },
+  {
+    "catalog": "114.0477.980",
+    "material_text": "AZG 611-86 3 1/2\" DKV REV MRU Glacier",
+    "label": "114.0470.457"
+  },
+  {
+    "catalog": "114.0477.979",
+    "material_text": "AZG 611-86 3 1/2\" DKV REV MRU Cashmere",
+    "label": "114.0470.455"
+  },
+  {
+    "catalog": "114.0477.978",
+    "material_text": "AZG 611-86 3 1/2\" DKV REV MRU Onyx",
+    "label": "114.0470.454"
+  },
+  {
+    "catalog": "114.0477.970",
+    "material_text": "AZG 651 3 1/2\" DKV REV MRU Steingrau",
+    "label": "114.0470.469"
+  },
+  {
+    "catalog": "114.0477.969",
+    "material_text": "AZG 651 3 1/2\" DKV REV MRU Glacier",
+    "label": "114.0470.468"
+  },
+  {
+    "catalog": "114.0477.968",
+    "material_text": "AZG 651 3 1/2\" DKV REV MRU Cashmere",
+    "label": "114.0470.466"
+  },
+  {
+    "catalog": "114.0477.967",
+    "material_text": "AZG 651 3 1/2\" DKV REV MRU Onyx",
+    "label": "114.0470.465"
+  },
+  {
+    "catalog": "114.0477.557",
+    "material_text": "MRG 612-E 3 1/2\" DRKV MUE Cashmere",
+    "label": "114.0297.144"
+  },
+  {
+    "catalog": "114.0477.553",
+    "material_text": "MRG 612-E 3 1/2\" DRKV MUE Glacier",
+    "label": "114.0196.794"
+  },
+  {
+    "catalog": "114.0477.552",
+    "material_text": "MRG 612-E 3 1/2\" DRKV MUE Steingrau",
+    "label": "114.0196.795"
+  },
+  {
+    "catalog": "114.0477.540",
+    "material_text": "MRG 612-E 3 1/2\" DRKV MUE Onyx",
+    "label": "114.0196.793"
+  },
+  {
+    "catalog": "114.0477.508",
+    "material_text": "MRG 611-62 3 1/2\" REV DRKV MUE Cashmere",
+    "label": "114.0297.109"
+  },
+  {
+    "catalog": "114.0477.504",
+    "material_text": "MRG 611-62 3 1/2\" REV DRKV MUE Glacier",
+    "label": "114.0180.329"
+  },
+  {
+    "catalog": "114.0477.503",
+    "material_text": "MRG 611-62 3 1/2\" REV DRKV MUE Steingrau",
+    "label": "114.0180.330"
+  },
+  {
+    "catalog": "114.0477.500",
+    "material_text": "MRG 611-62 3 1/2\" REV DRKV MUE Onyx",
+    "label": "114.0180.327"
+  },
+  {
+    "catalog": "114.0477.493",
+    "material_text": "MRG 611-78 3 1/2\" REV DRKV MUE Cashmere",
+    "label": "114.0297.132"
+  },
+  {
+    "catalog": "114.0477.488",
+    "material_text": "MRG 611-78 3 1/2\" REV DRKV MUE Glacier",
+    "label": "114.0061.682"
+  },
+  {
+    "catalog": "114.0477.487",
+    "material_text": "MRG 611-78 3 1/2\" REV DRKV MUE Steingrau",
+    "label": "114.0061.685"
+  },
+  {
+    "catalog": "114.0477.485",
+    "material_text": "MRG 611-78 3 1/2\" REV DRKV MUE Onyx",
+    "label": "114.0152.494"
+  },
+  {
+    "catalog": "114.0477.377",
+    "material_text": "MRG 611-97 XL 3 1/2\" REV DRKV MUE Cashme",
+    "label": "114.0330.883"
+  },
+  {
+    "catalog": "114.0477.373",
+    "material_text": "MRG 611-97 XL 3 1/2\" REV DRKV MUE Glacie",
+    "label": "114.0330.857"
+  },
+  {
+    "catalog": "114.0477.372",
+    "material_text": "MRG 611-97 XL 3 1/2\" REV DRKV MUE Steing",
+    "label": "114.0330.887"
+  },
+  {
+    "catalog": "114.0477.370",
+    "material_text": "MRG 611-97 XL 3 1/2\" REV DRKV MUE Onyx",
+    "label": "114.0330.889"
+  },
+  {
+    "catalog": "114.0477.361",
+    "material_text": "MRG 611-97 3 1/2\" REV DRKV MUE Cashmere",
+    "label": "114.0297.134"
+  },
+  {
+    "catalog": "114.0477.356",
+    "material_text": "MRG 611-97 3 1/2\" REV DRKV MUE Glacier",
+    "label": "114.0055.923"
+  },
+  {
+    "catalog": "114.0477.355",
+    "material_text": "MRG 611-97 3 1/2\" REV DRKV MUE Steingra",
+    "label": "114.0055.920"
+  },
+  {
+    "catalog": "114.0477.353",
+    "material_text": "MRG 611-97 3 1/2\" REV DRKV MUE Onyx",
+    "label": "114.0152.495"
+  },
+  {
+    "catalog": "114.0477.307",
+    "material_text": "MRG 651-78 3 1/2\" REV DRKV MUE Cashmere",
+    "label": "114.0297.136"
+  },
+  {
+    "catalog": "114.0477.303",
+    "material_text": "MRG 651-78 3 1/2\" REV DRKV MUE Glacier",
+    "label": "114.0196.322"
+  },
+  {
+    "catalog": "114.0477.302",
+    "material_text": "MRG 651-78 3 1/2\" REV DRKV MUE Steingrau",
+    "label": "114.0196.323"
+  },
+  {
+    "catalog": "114.0477.282",
+    "material_text": "MRG 651-78 3 1/2\" REV DRKV MUE Onyx",
+    "label": "114.0196.320"
+  },
+  {
+    "catalog": "114.0477.278",
+    "material_text": "MRG 651-97 3 1/2\" REV DRKV MUE AB Cashme",
+    "label": "114.0297.137"
+  },
+  {
+    "catalog": "114.0477.271",
+    "material_text": "MRG 651-97 3 1/2\" REV DRKV MUE AB Glacie",
+    "label": "114.0061.393"
+  },
+  {
+    "catalog": "114.0477.260",
+    "material_text": "MRG 651-97 3 1/2\" REV DRKV MUE AB Steing",
+    "label": "114.0061.394"
+  },
+  {
+    "catalog": "114.0477.257",
+    "material_text": "MRG 651-97 3 1/2\" REV DRKV MUE AB Onyx",
+    "label": "114.0152.496"
+  },
+  {
+    "catalog": "114.0477.044",
+    "material_text": "MTG 611 3 1/2\" DRKV MUE TR Cashmere",
+    "label": "114.0294.634"
+  },
+  {
+    "catalog": "114.0477.041",
+    "material_text": "MTG 611 3 1/2\" DRKV MUE TL Cashmere",
+    "label": "114.0294.632"
+  },
+  {
+    "catalog": "114.0477.022",
+    "material_text": "MTG 611 3 1/2\" DRKV MUE TR Glacier",
+    "label": "114.0017.800"
+  },
+  {
+    "catalog": "114.0477.021",
+    "material_text": "MTG 611 3 1/2\" DRKV MUE TL Glacier",
+    "label": "114.0017.799"
+  },
+  {
+    "catalog": "114.0477.000",
+    "material_text": "MTG 611 3 1/2\" DRKV MUE TR Steingrau",
+    "label": "114.0017.796"
+  },
+  {
+    "catalog": "114.0476.999",
+    "material_text": "MTG 611 3 1/2\" DRKV MUE TL Steingrau",
+    "label": "114.0017.795"
+  },
+  {
+    "catalog": "114.0476.996",
+    "material_text": "MTG 611 3 1/2\" DRKV MUE TR Onyx",
+    "label": "114.0178.882"
+  },
+  {
+    "catalog": "114.0476.995",
+    "material_text": "MTG 611 3 1/2\" DRKV MUE TL Onyx",
+    "label": "114.0178.860"
+  },
+  {
+    "catalog": "114.0476.149",
+    "material_text": "MRG 611-78 XL 3 1/2\" DRKV REV Onyx",
+    "label": "114.0347.017"
+  },
+  {
+    "catalog": "114.0476.147",
+    "material_text": "MRG 611-78 XL 3 1/2\" DRKV REV Steingrau",
+    "label": "114.0347.015"
+  },
+  {
+    "catalog": "114.0476.144",
+    "material_text": "MRG 611-78 XL 3 1/2\" DRKV REV Cashmere",
+    "label": "114.0347.000"
+  },
+  {
+    "catalog": "114.0476.120",
+    "material_text": "MRG 611-78 XL 3 1/2\" DRKV REV Glacier",
+    "label": "114.0346.993"
+  },
+  {
+    "catalog": "114.0338.337",
+    "material_text": "STG 651-86 3 1/2\" MAV REV EXC AB Steingr",
+    "label": "114.0334.164"
+  },
+  {
+    "catalog": "114.0338.334",
+    "material_text": "STG 651-86 3 1/2\" MAV REV EXC AB Cashmer",
+    "label": "114.0334.160"
+  },
+  {
+    "catalog": "114.0338.333",
+    "material_text": "STG 651-86 3 1/2\" MAV REV EXC AB Onyx",
+    "label": "114.0334.166"
+  },
+  {
+    "catalog": "114.0338.326",
+    "material_text": "STG 651-86 3 1/2\" MAV REV SV AB Steingra",
+    "label": "114.0334.164"
+  },
+  {
+    "catalog": "114.0338.310",
+    "material_text": "STG 651-86 3 1/2\" MAV REV SV AB Glacier",
+    "label": "114.0334.156"
+  },
+  {
+    "catalog": "114.0338.207",
+    "material_text": "STG 651-86 3 1/2\" MAV REV SV AB Cashmere",
+    "label": "114.0334.160"
+  },
+  {
+    "catalog": "114.0338.205",
+    "material_text": "STG 651-86 3 1/2\" MAV REV SV AB Onyx",
+    "label": "114.0334.166"
+  },
+  {
+    "catalog": "114.0336.939",
+    "material_text": "BFG 611-86 3 1/2\" EXC REV MUE Onyx",
+    "label": "114.0334.155"
+  },
+  {
+    "catalog": "114.0336.936",
+    "material_text": "BFG 611-86 3 1/2\" EXC REV  MUE Steingrau",
+    "label": "114.0334.153"
+  },
+  {
+    "catalog": "114.0336.916",
+    "material_text": "BFG 611-86 3 1/2\" EXC REV MUE Cashmere",
+    "label": "114.0334.129"
+  },
+  {
+    "catalog": "114.0336.417",
+    "material_text": "BFG 611-86 3 1/2\" EXC REV  MUE Glacier",
+    "label": "114.0334.125"
+  },
+  {
+    "catalog": "114.0336.415",
+    "material_text": "STG 651-86 3 1/2\" MAV REV EXC AB Glacier",
+    "label": "114.0334.156"
+  },
+  {
+    "catalog": "114.0303.684",
+    "material_text": "STG 614-78 3 1/2\" MAV REV EXC Cashmere",
+    "label": "114.0303.120"
+  },
+  {
+    "catalog": "114.0303.682",
+    "material_text": "STG 614-78 3 1/2\" MAV REV EXC Steingrau",
+    "label": "114.0303.116"
+  },
+  {
+    "catalog": "114.0303.681",
+    "material_text": "STG 614-78 3 1/2\" MAV REV EXC Glacier",
+    "label": "114.0303.113"
+  },
+  {
+    "catalog": "114.0303.677",
+    "material_text": "STG 614-78 3 1/2\" EXC REV MUE Onyx",
+    "label": "114.0303.108"
+  },
+  {
+    "catalog": "114.0303.673",
+    "material_text": "STG 614-78 3 1/2\" MAV REV SV Cashmere",
+    "label": "114.0303.120"
+  },
+  {
+    "catalog": "114.0303.671",
+    "material_text": "STG 614-78 3 1/2\" MAV REV SV Steingrau",
+    "label": "114.0303.116"
+  },
+  {
+    "catalog": "114.0303.670",
+    "material_text": "STG 614-78 3 1/2\" MAV REV SV Glacier",
+    "label": "114.0303.113"
+  },
+  {
+    "catalog": "114.0303.666",
+    "material_text": "STG 614-78 3 1/2\" MAV REV SV Onyx",
+    "label": "114.0303.108"
+  },
+  {
+    "catalog": "114.0302.767",
+    "material_text": "ROG 610-41 3 1/2\" MAV EXC OT Cashmere",
+    "label": "114.0297.628"
+  },
+  {
+    "catalog": "114.0302.766",
+    "material_text": "ROG 610-41 3 1/2\" MAV SV OT Cashmere",
+    "label": "114.0297.628"
+  },
+  {
+    "catalog": "114.0302.763",
+    "material_text": "STG 614-86 3 1/2\" MAV REV EXC Cashmere",
+    "label": "114.0297.148"
+  },
+  {
+    "catalog": "114.0302.762",
+    "material_text": "STG 614-86 3 1/2\" MAV REV SV Cashmere",
+    "label": "114.0297.148"
+  },
+  {
+    "catalog": "114.0302.761",
+    "material_text": "STG 614-86 3 1/2\" MAV REV EXC Glacier",
+    "label": "114.0196.477"
+  },
+  {
+    "catalog": "114.0302.760",
+    "material_text": "STG 614-86 3 1/2\" MAV REV SV Glacier",
+    "label": "114.0196.477"
+  },
+  {
+    "catalog": "114.0302.752",
+    "material_text": "STG 614-86 3 1/2\" MAV REV EXC Onyx",
+    "label": "114.0196.475"
+  },
+  {
+    "catalog": "114.0302.751",
+    "material_text": "STG 614-86 3 1/2\" MAV REV SV Onyx",
+    "label": "114.0196.475"
+  },
+  {
+    "catalog": "114.0302.021",
+    "material_text": "BFG 620-86 3 1/2\" EXC MUE Cashmere",
+    "label": "114.0297.706"
+  },
+  {
+    "catalog": "114.0302.016",
+    "material_text": "BFG 620-86 3 1/2\" EXC MUE Glacier",
+    "label": "114.0266.480"
+  },
+  {
+    "catalog": "114.0302.015",
+    "material_text": "BFG 620-86 3 1/2\" EXC MUE Steingrau",
+    "label": "114.0266.481"
+  },
+  {
+    "catalog": "114.0301.961",
+    "material_text": "BFG 651-97 3 1/2\" EXC REV AB Cashmere",
+    "label": "114.0297.702"
+  },
+  {
+    "catalog": "114.0301.951",
+    "material_text": "BFG 651-78 3 1/2\" EXC REV AB Cashmere",
+    "label": "114.0297.712"
+  },
+  {
+    "catalog": "114.0301.907",
+    "material_text": "BFG 611-78 3 1/2\" EXC REV MUE Cashmere",
+    "label": "114.0297.694"
+  },
+  {
+    "catalog": "114.0301.903",
+    "material_text": "BFG 611-62 3 1/2\" EXC REV MUE Cashmere",
+    "label": "114.0297.708"
+  },
+  {
+    "catalog": "114.0301.373",
+    "material_text": "BFG 620-86 3 1/2\" EXC MUE Onyx",
+    "label": "114.0266.478"
+  },
+  {
+    "catalog": "114.0301.368",
+    "material_text": "BFG 651-78 3 1/2\" EXC REV AB Glacier",
+    "label": "114.0266.418"
+  },
+  {
+    "catalog": "114.0301.367",
+    "material_text": "BFG 651-78 3 1/2\" EXC REV AB Steingrau",
+    "label": "114.0266.419"
+  },
+  {
+    "catalog": "114.0301.345",
+    "material_text": "BFG 651-78 3 1/2\" EXC REV AB Onyx",
+    "label": "114.0266.416"
+  },
+  {
+    "catalog": "114.0301.335",
+    "material_text": "BFG 611-62 3 1/2\" EXC REV MUE Glacier",
+    "label": "114.0266.042"
+  },
+  {
+    "catalog": "114.0301.333",
+    "material_text": "BFG 611-62 3 1/2\" EXC REV MUE Steingrau",
+    "label": "114.0266.044"
+  },
+  {
+    "catalog": "114.0301.331",
+    "material_text": "BFG 611-62 3 1/2\" EXC REV MUE Onyx",
+    "label": "114.0266.040"
+  },
+  {
+    "catalog": "114.0259.826",
+    "material_text": "STG 614-86 3 1/2\" MAV REV EXC Steingrau",
+    "label": "114.0196.492"
+  },
+  {
+    "catalog": "114.0256.627",
+    "material_text": "BFG 651 3 1/2\" EXC REV AB GSteingrau",
+    "label": "114.0198.879"
+  },
+  {
+    "catalog": "114.0256.626",
+    "material_text": "BFG 651 3 1/2\" EXC REV AB GGlacier",
+    "label": "114.0198.878"
+  },
+  {
+    "catalog": "114.0256.625",
+    "material_text": "BFG 651 3 1/2\" EXC REV AB GOnyx",
+    "label": "114.0198.876"
+  },
+  {
+    "catalog": "114.0256.612",
+    "material_text": "BFG 611 3 1/2\" EXC REV GSteingrau",
+    "label": "114.0198.678"
+  },
+  {
+    "catalog": "114.0256.611",
+    "material_text": "BFG 611 3 1/2\" EXC REV GGlacier",
+    "label": "114.0198.677"
+  },
+  {
+    "catalog": "114.0256.610",
+    "material_text": "BFG 611 3 1/2\" EXC REV GOnyx",
+    "label": "114.0198.674"
+  },
+  {
+    "catalog": "114.0199.718",
+    "material_text": "ROG 610-41 3 1/2\" MAV SV OT Onyx",
+    "label": "114.0198.099"
+  },
+  {
+    "catalog": "114.0199.717",
+    "material_text": "ROG 610-41 3 1/2\" MAV EXC OT Onyx",
+    "label": "114.0198.099"
+  },
+  {
+    "catalog": "114.0197.797",
+    "material_text": "STG 614-86 3 1/2\" MAV REV SV Steingrau",
+    "label": "114.0196.492"
+  },
+  {
+    "catalog": "114.0009.546",
+    "material_text": "ROG 610-41 3 1/2\" MAV SV OT Glacier",
+    "label": "114.0000.604"
+  },
+  {
+    "catalog": "114.0009.542",
+    "material_text": "ROG 610-41 3 1/2\" MAV SV OT Steingrau",
+    "label": "114.0000.600"
+  },
+  {
+    "catalog": "114.0009.509",
+    "material_text": "ROG 610-41 3 1/2\" MAV EXC OT Glacier",
+    "label": "114.0000.604"
+  },
+  {
+    "catalog": "114.0009.505",
+    "material_text": "ROG 610-41 3 1/2\" MAV EXC OT Steingrau",
+    "label": "114.0000.600"
+  },
+  {
+    "catalog": "101.0744.946",
+    "material_text": "SKL 611-78/50 3 1/2\" EXC REV 2LB FRL",
+    "label": "101.0707.307"
+  },
+  {
+    "catalog": "101.0738.585",
+    "material_text": "FLN 611-62/44 3 1/2\" EXC OLB REV WA FRL",
+    "label": "101.0737.483"
+  },
+  {
+    "catalog": "101.0738.584",
+    "material_text": "FLN 611-78/44 3 1/2\" SV OLV REV  WA FRL",
+    "label": "101.0737.481"
+  },
+  {
+    "catalog": "101.0738.583",
+    "material_text": "FLN 611-86/44 3 1/2\" SV OLB REV WA FRL",
+    "label": "101.0737.320"
+  },
+  {
+    "catalog": "101.0729.488",
+    "material_text": "SKL 611-62/50 3 EXC REV 2BL FRL",
+    "label": "101.0707.497"
+  },
+  {
+    "catalog": "101.0727.746",
+    "material_text": "SKL 611-100/50 3 1/2\" EXC GB REV 2LB",
+    "label": "101.0706.856"
+  },
+  {
+    "catalog": "101.0725.057",
+    "material_text": "ROX 610/110-38 3 1/2\" SV OLB UES FRL",
+    "label": "101.0686.657"
+  },
+  {
+    "catalog": "101.0714.971",
+    "material_text": "ROX 610-39 3 1/2\" SV OTL LB A FRL",
+    "label": "101.0709.177"
+  },
+  {
+    "catalog": "101.0714.957",
+    "material_text": "SKN 610-37/44 3 1/2\" SV OT A OLB FRL",
+    "label": "101.0708.052"
+  },
+  {
+    "catalog": "101.0714.951",
+    "material_text": "SKX 651-95 E 3 1/2\" EXC TL UES 2LB FRL",
+    "label": "101.0709.183"
+  },
+  {
+    "catalog": "101.0714.950",
+    "material_text": "SKX 620-34-34/86 3 1/2\" EXC A 2LB FRL",
+    "label": "101.0709.121"
+  },
+  {
+    "catalog": "101.0714.948",
+    "material_text": "SKX 611-62/50 3 1/2\" EXC REV 2LB FRL",
+    "label": "101.0707.495"
+  },
+  {
+    "catalog": "101.0714.947",
+    "material_text": "SKL 611-78/50 3 1/2\" EXC REV 2LB FRL",
+    "label": "101.0707.418"
+  },
+  {
+    "catalog": "101.0714.946",
+    "material_text": "SKX 611-78/50 3 1/2\" EXC GB REV 2LB FRL",
+    "label": "101.0707.304"
+  },
+  {
+    "catalog": "101.0714.945",
+    "material_text": "SKX 611-78/50 3 1/2\" EXC REV 2LB FRL",
+    "label": "101.0707.416"
+  },
+  {
+    "catalog": "101.0714.944",
+    "material_text": "SKX 611-100/50 3 1/2\"EXC GB REV 2LB FRL",
+    "label": "101.0706.854"
+  },
+  {
+    "catalog": "101.0623.960",
+    "material_text": "BCX 610-51 3 1/2\" EXC UEL 2LB Edst",
+    "label": "101.0624.054"
+  },
+  {
+    "catalog": "101.0622.893",
+    "material_text": "BCX 610-51 3 1/2\" SV UEL LB Edst",
+    "label": "101.0438.083"
+  },
+  {
+    "catalog": "101.0511.928",
+    "material_text": "SKL 611-86 3 1/2\" MAV EXC REV 2BL MUE",
+    "label": "101.0264.141"
+  },
+  {
+    "catalog": "101.0469.740",
+    "material_text": "SKX 621 3 1/2\" EXC REV EXV SV 2BL MUE",
+    "label": "101.0264.130"
+  },
+  {
+    "catalog": "101.0464.337",
+    "material_text": "SKX 611-86 3 1/2\" EXC REV 2BL MUE",
+    "label": "101.0264.127"
+  },
+  {
+    "catalog": "101.0464.044",
+    "material_text": "SKX 651 3 1/2\" EXC REV 2BL MUE AB",
+    "label": "101.0455.447"
+  }
+]
