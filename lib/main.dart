@@ -24,51 +24,10 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 
+import 'android_session_restore.dart';
+import 'app_language.dart';
 import 'dxf_layer_processor.dart';
 import 'ocr_label_rules.dart';
-
-enum AppLanguage {
-  german('de'),
-  english('en');
-
-  final String code;
-
-  const AppLanguage(this.code);
-}
-
-class AppLanguageController extends ValueNotifier<AppLanguage> {
-  static const String _preferenceKey = 'app_language';
-
-  AppLanguageController() : super(AppLanguage.german);
-
-  Future<void> load() async {
-    try {
-      final prefs = SharedPreferencesAsync();
-      final code = await prefs.getString(_preferenceKey);
-      value = code == AppLanguage.english.code
-          ? AppLanguage.english
-          : AppLanguage.german;
-    } catch (_) {
-      value = AppLanguage.german;
-    }
-  }
-
-  Future<void> change(AppLanguage language) async {
-    if (value != language) value = language;
-    try {
-      final prefs = SharedPreferencesAsync();
-      await prefs.setString(_preferenceKey, language.code);
-    } catch (_) {
-      // Die Sprache bleibt für die aktuelle Sitzung trotzdem aktiv.
-    }
-  }
-}
-
-final AppLanguageController appLanguageController = AppLanguageController();
-
-bool get isEnglish => appLanguageController.value == AppLanguage.english;
-
-String tr(String german, String english) => isEnglish ? english : german;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -81,24 +40,27 @@ class AToolApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<AppLanguage>(
-      valueListenable: appLanguageController,
-      builder: (context, language, _) => MaterialApp(
-        title: 'ATool',
-        debugShowCheckedModeBanner: false,
-        locale: Locale(language.code),
-        supportedLocales: const [Locale('de'), Locale('en')],
-        localizationsDelegates: const [
-          GlobalMaterialLocalizations.delegate,
-          GlobalWidgetsLocalizations.delegate,
-          GlobalCupertinoLocalizations.delegate,
-        ],
-        theme: ThemeData(
-          useMaterial3: true,
-          colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
-          scaffoldBackgroundColor: const Color(0xFFF5F5F5),
+    return AppLanguageScope(
+      child: ValueListenableBuilder<AppLanguage>(
+        valueListenable: appLanguageController,
+        builder: (context, language, _) => MaterialApp(
+          title: 'ATool',
+          debugShowCheckedModeBanner: false,
+          locale:
+              GlobalMaterialLocalizations.delegate.isSupported(language.locale)
+              ? language.locale
+              : const Locale('en'),
+          supportedLocales: AppLanguage.values
+              .map((language) => language.locale)
+              .where(GlobalMaterialLocalizations.delegate.isSupported),
+          localizationsDelegates: GlobalMaterialLocalizations.delegates,
+          theme: ThemeData(
+            useMaterial3: true,
+            colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
+            scaffoldBackgroundColor: const Color(0xFFF5F5F5),
+          ),
+          home: const SplashPage(),
         ),
-        home: const SplashPage(),
       ),
     );
   }
@@ -173,8 +135,14 @@ class AppStorage {
     required String accessToken,
     required String refreshToken,
   }) async {
-    await _write('access_token', accessToken);
-    await _write('refresh_token', refreshToken);
+    try {
+      await _write('access_token', accessToken);
+      await _write('refresh_token', refreshToken);
+    } catch (_) {
+      await _delete('access_token');
+      await _delete('refresh_token');
+      rethrow;
+    }
   }
 
   static Future<void> updateAccessToken(String accessToken) async {
@@ -182,6 +150,7 @@ class AppStorage {
   }
 
   static Future<void> clearTokens() async {
+    await ApiService.androidRestore.discard();
     await _delete('access_token');
     await _delete('refresh_token');
     await LicenseCheckPrefs.clear();
@@ -1133,6 +1102,14 @@ class DeviceMetaService {
 
 class ApiService {
   static const Duration requestTimeout = Duration(seconds: 12);
+  static final androidRestore = AndroidSessionRestore(
+    endpoint: Uri.parse('${AppConfig.baseUrl}/restore-credentials.php'),
+    readAccessToken: AppStorage.getAccessToken,
+    refreshAccessToken: () async {
+      await refreshAccessToken();
+    },
+  );
+  static Future<Map<String, dynamic>>? _refreshInProgress;
 
   static Future<http.Response> _get(Uri uri, {Map<String, String>? headers}) {
     return http.get(uri, headers: headers).timeout(requestTimeout);
@@ -1210,7 +1187,12 @@ class ApiService {
     return Map<String, dynamic>.from(jsonDecode(response.body));
   }
 
-  static Future<Map<String, dynamic>> refreshAccessToken() async {
+  static Future<Map<String, dynamic>> refreshAccessToken() =>
+      _refreshInProgress ??= _refreshAccessToken().whenComplete(() {
+        _refreshInProgress = null;
+      });
+
+  static Future<Map<String, dynamic>> _refreshAccessToken() async {
     final refreshToken = await AppStorage.getRefreshToken();
 
     if (refreshToken == null || refreshToken.isEmpty) {
@@ -1300,7 +1282,19 @@ class ApiService {
       if (accessToken != null && accessToken.isNotEmpty) {
         final uri = Uri.parse('${AppConfig.baseUrl}/logout.php');
 
-        await _post(uri, headers: {'Authorization': 'Bearer $accessToken'});
+        final response = await _post(
+          uri,
+          headers: {'Authorization': 'Bearer $accessToken'},
+        );
+        if (response.statusCode == 401) {
+          final refreshed = await refreshAccessToken();
+          final token = await AppStorage.getAccessToken();
+          if (refreshed['success'] == true &&
+              token != null &&
+              token.isNotEmpty) {
+            await _post(uri, headers: {'Authorization': 'Bearer $token'});
+          }
+        }
       }
     } catch (_) {}
 
@@ -1377,7 +1371,7 @@ class _SplashPageState extends State<SplashPage> {
 
   Future<void> _checkLogin() async {
     try {
-      await AppStorage.getOrCreateDeviceUuid();
+      final deviceUuid = await AppStorage.getOrCreateDeviceUuid();
 
       final accessToken = await AppStorage.getAccessToken();
       final refreshToken = await AppStorage.getRefreshToken();
@@ -1387,6 +1381,7 @@ class _SplashPageState extends State<SplashPage> {
       if ((accessToken != null && accessToken.isNotEmpty) ||
           (refreshToken != null && refreshToken.isNotEmpty)) {
         if (!await LicenseCheckPrefs.isCheckDue()) {
+          unawaited(ApiService.androidRestore.enroll());
           if (!mounted) return;
 
           Navigator.of(context).pushReplacement(
@@ -1417,15 +1412,39 @@ class _SplashPageState extends State<SplashPage> {
         }
 
         await LicenseCheckPrefs.markSuccessfulCheckNow();
+        unawaited(ApiService.androidRestore.enroll());
         if (!mounted) return;
 
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (_) => const MainSearchPage()),
         );
       } else {
-        Navigator.of(
-          context,
-        ).pushReplacement(MaterialPageRoute(builder: (_) => const LoginPage()));
+        final session = await ApiService.androidRestore.tryRestore(
+          deviceUuid,
+          () async {
+            final meta = await DeviceMetaService.load();
+            return {
+              'device_name': meta.deviceName,
+              'os_version': meta.osVersion,
+              'app_version': meta.appVersion,
+            };
+          },
+        );
+        if (session != null) {
+          await AppStorage.saveTokens(
+            accessToken: session.accessToken,
+            refreshToken: session.refreshToken,
+          );
+          await LicenseCheckPrefs.markSuccessfulCheckNow();
+          unawaited(ApiService.androidRestore.enroll(newSession: true));
+        }
+        if (!mounted) return;
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) =>
+                session == null ? const LoginPage() : const MainSearchPage(),
+          ),
+        );
       }
     } catch (_) {
       if (await LicenseCheckPrefs.isWithinOfflineGracePeriod()) {
@@ -1519,6 +1538,7 @@ class _LoginPageState extends State<LoginPage> {
           refreshToken: refreshToken,
         );
         await LicenseCheckPrefs.markSuccessfulCheckNow();
+        unawaited(ApiService.androidRestore.enroll(newSession: true));
 
         if (!mounted) return;
 
@@ -1559,6 +1579,7 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
+    AppLanguageScope.watch(context);
     return Scaffold(
       body: SafeArea(
         child: LayoutBuilder(
@@ -1607,7 +1628,7 @@ class _LoginPageState extends State<LoginPage> {
                             TextField(
                               controller: _emailController,
                               decoration: InputDecoration(
-                                labelText: 'E-Mail',
+                                labelText: tr('E-Mail', 'Email'),
                                 border: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(14),
                                 ),
@@ -1819,6 +1840,13 @@ class _LoginPageState extends State<LoginPage> {
                                   ),
                                 ),
                               ),
+                            TextButton.icon(
+                              onPressed: () => chooseAppLanguage(context),
+                              icon: const Icon(Icons.translate),
+                              label: Text(
+                                appLanguageController.value.nativeName,
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -1963,7 +1991,7 @@ class _PasswordResetPageState extends State<PasswordResetPage> {
                         textInputAction: TextInputAction.done,
                         onSubmitted: (_) => _isLoading ? null : _requestReset(),
                         decoration: InputDecoration(
-                          labelText: 'E-Mail',
+                          labelText: tr('E-Mail', 'Email'),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(14),
                           ),
@@ -2181,7 +2209,7 @@ class _RegisterTrialPageState extends State<RegisterTrialPage> {
                     TextField(
                       controller: _emailController,
                       decoration: InputDecoration(
-                        labelText: 'E-Mail',
+                        labelText: tr('E-Mail', 'Email'),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(14),
                         ),
@@ -5064,14 +5092,22 @@ class _MainSearchPageState extends State<MainSearchPage>
 
         if (bestUsedSearchText.isNotEmpty) {
           final rotationInfo = _isIosOcrMode && bestRotation != 0
-              ? isEnglish
-                    ? ' Image rotation: $bestRotation°.'
-                    : ' Bilddrehung: $bestRotation°.'
+              ? tr(
+                  " Bilddrehung: {degrees}°.",
+                  " Image rotation: {degrees}°.",
+                  {'degrees': bestRotation},
+                )
               : '';
 
-          _message = isEnglish
-              ? 'ATool match from smart search: $bestUsedSearchText – showing the best ${bestMatches.length} results.$rotationInfo'
-              : 'ATool-Treffer über intelligente Suche: $bestUsedSearchText – beste ${bestMatches.length} Treffer angezeigt.$rotationInfo';
+          _message = tr(
+            "ATool-Treffer über intelligente Suche: {query} – beste {count} Treffer angezeigt.{rotation}",
+            "ATool match from smart search: {query} – showing the best {count} results.{rotation}",
+            {
+              'query': bestUsedSearchText,
+              'count': bestMatches.length,
+              'rotation': rotationInfo,
+            },
+          );
         } else {
           _message = '';
         }
@@ -5099,9 +5135,11 @@ class _MainSearchPageState extends State<MainSearchPage>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            isEnglish
-                ? '${bestMatches.length} items found on the label.'
-                : '${bestMatches.length} Artikel aus dem Aufkleber gefunden.',
+            tr(
+              "{count} Artikel aus dem Aufkleber gefunden.",
+              "{count} items found on the label.",
+              {'count': bestMatches.length},
+            ),
           ),
         ),
       );
@@ -5247,9 +5285,11 @@ class _MainSearchPageState extends State<MainSearchPage>
             : '';
 
         if (found.isNotEmpty && usedSearchTerm != q) {
-          _message = isEnglish
-              ? 'No exact match for “$q”. Showing results for “$usedSearchTerm”.'
-              : 'Kein exakter Treffer für "$q". Treffer für "$usedSearchTerm" angezeigt.';
+          _message = tr(
+            "Kein exakter Treffer für \"{query}\". Treffer für \"{alternative}\" angezeigt.",
+            "No exact match for “{query}”. Showing results for “{alternative}”.",
+            {'query': q, 'alternative': usedSearchTerm},
+          );
         } else {
           _message = '';
         }
@@ -5412,9 +5452,11 @@ class _MainSearchPageState extends State<MainSearchPage>
       builder: (_) => AlertDialog(
         title: Text(tr('Download-Ziel', 'Download destination')),
         content: Text(
-          isEnglish
-              ? 'Use the saved folder?\n\n$dirLabel'
-              : 'Gespeicherten Ordner verwenden?\n\n$dirLabel',
+          tr(
+            "Gespeicherten Ordner verwenden?\n\n{folder}",
+            "Use the saved folder?\n\n{folder}",
+            {'folder': dirLabel},
+          ),
         ),
         actions: [
           TextButton(
@@ -5663,10 +5705,10 @@ class _MainSearchPageState extends State<MainSearchPage>
                     ),
                   ),
                   const SizedBox(width: 12),
-                  const Expanded(
+                  Expanded(
                     child: Text(
-                      'Download',
-                      style: TextStyle(
+                      tr('Download', 'Download'),
+                      style: const TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.w700,
                       ),
@@ -5774,9 +5816,11 @@ class _MainSearchPageState extends State<MainSearchPage>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              isEnglish
-                  ? 'Download failed (${response.statusCode})'
-                  : 'Download fehlgeschlagen (${response.statusCode})',
+              tr(
+                "Download fehlgeschlagen ({status})",
+                "Download failed ({status})",
+                {'status': response.statusCode},
+              ),
             ),
           ),
         );
@@ -5883,9 +5927,9 @@ class _MainSearchPageState extends State<MainSearchPage>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            isEnglish
-                ? 'Saved to: $directoryLabel'
-                : 'Gespeichert in: $directoryLabel',
+            tr("Gespeichert in: {folder}", "Saved to: {folder}", {
+              'folder': directoryLabel,
+            }),
           ),
         ),
       );
@@ -5916,9 +5960,11 @@ class _MainSearchPageState extends State<MainSearchPage>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            isEnglish
-                ? 'Could not open link: $url'
-                : 'Link konnte nicht geöffnet werden: $url',
+            tr(
+              "Link konnte nicht geöffnet werden: {url}",
+              "Could not open link: {url}",
+              {'url': url},
+            ),
           ),
         ),
       );
@@ -6241,6 +6287,7 @@ class _MainSearchPageState extends State<MainSearchPage>
 
   @override
   Widget build(BuildContext context) {
+    AppLanguageScope.watch(context);
     final rawSearch = _searchController.text.trim();
     final search = _activeHighlightTerm.isNotEmpty
         ? _activeHighlightTerm
@@ -6325,9 +6372,11 @@ class _MainSearchPageState extends State<MainSearchPage>
                             unawaited(_handleSearchDirect(value));
                           },
                           decoration: InputDecoration(
-                            hintText: isEnglish
-                                ? 'Enter item number (min. $manualSearchLen characters)…'
-                                : 'Artikelnummer eingeben (min. $manualSearchLen Zeichen)…',
+                            hintText: tr(
+                              "Artikelnummer eingeben (min. {count} Zeichen)…",
+                              "Enter item number (min. {count} characters)…",
+                              {'count': manualSearchLen},
+                            ),
                             filled: true,
                             fillColor: Colors.white,
                             contentPadding: const EdgeInsets.symmetric(
@@ -6696,7 +6745,9 @@ class _MainSearchPageState extends State<MainSearchPage>
                                                 icon: const Icon(
                                                   Icons.download_outlined,
                                                 ),
-                                                label: const Text('Download'),
+                                                label: Text(
+                                                  tr('Download', 'Download'),
+                                                ),
                                                 style: ElevatedButton.styleFrom(
                                                   backgroundColor: const Color(
                                                     0xFF444444,
@@ -6934,7 +6985,8 @@ class _InfoLicensePageState extends State<InfoLicensePage> {
       final dxfLayerSettings = await DxfLayerPrefs.getSettings();
       final offlineImageStatus = await OfflineImageStore.getStatus();
       final cachedCatalogJson = await CatalogCachePrefs.getCatalogJson();
-      final cachedCatalog = cachedCatalogJson == null || cachedCatalogJson.isEmpty
+      final cachedCatalog =
+          cachedCatalogJson == null || cachedCatalogJson.isEmpty
           ? <CatalogItem>[]
           : await compute(_parseCatalogItemsInBackground, cachedCatalogJson);
       final catalogCachedAt = await CatalogCachePrefs.getCatalogCachedAt();
@@ -7170,12 +7222,6 @@ class _InfoLicensePageState extends State<InfoLicensePage> {
     });
   }
 
-  Future<void> _setLanguage(AppLanguage language) async {
-    await appLanguageController.change(language);
-    if (!mounted) return;
-    setState(() {});
-  }
-
   void _openAppHelp() {
     Navigator.of(
       context,
@@ -7228,44 +7274,6 @@ class _InfoLicensePageState extends State<InfoLicensePage> {
         ),
       ),
     );
-  }
-
-  Future<void> _chooseLanguage() async {
-    final language = await showModalBottomSheet<AppLanguage>(
-      context: context,
-      showDragHandle: true,
-      builder: (sheetContext) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                tr('Sprache auswählen', 'Select language'),
-                style: Theme.of(
-                  sheetContext,
-                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 10),
-              _LanguageChoiceTile(
-                title: 'Deutsch',
-                selected: appLanguageController.value == AppLanguage.german,
-                onTap: () => Navigator.of(sheetContext).pop(AppLanguage.german),
-              ),
-              _LanguageChoiceTile(
-                title: 'English',
-                selected: appLanguageController.value == AppLanguage.english,
-                onTap: () =>
-                    Navigator.of(sheetContext).pop(AppLanguage.english),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-
-    if (language != null) await _setLanguage(language);
   }
 
   Future<({String value, String label})?> _pickDownloadDirectory() async {
@@ -7521,15 +7529,19 @@ class _InfoLicensePageState extends State<InfoLicensePage> {
       final color = entry.value;
 
       if (color == null) {
-        return isEnglish
-            ? '${entry.key}: Enter a color from 1 to 255.'
-            : '${entry.key}: Bitte eine Farbe von 1 bis 255 eintragen.';
+        return tr(
+          "{layer}: Bitte eine Farbe von 1 bis 255 eintragen.",
+          "{layer}: Enter a color from 1 to 255.",
+          {'layer': entry.key},
+        );
       }
 
       if (color < 1 || color > 255) {
-        return isEnglish
-            ? '${entry.key}: The color must be between 1 and 255.'
-            : '${entry.key}: Die Farbe muss zwischen 1 und 255 liegen.';
+        return tr(
+          "{layer}: Die Farbe muss zwischen 1 und 255 liegen.",
+          "{layer}: The color must be between 1 and 255.",
+          {'layer': entry.key},
+        );
       }
     }
 
@@ -7590,11 +7602,12 @@ class _InfoLicensePageState extends State<InfoLicensePage> {
     if (value == null) return tr('Noch nie', 'Never');
     final date = MaterialLocalizations.of(context).formatMediumDate(value);
     final time = TimeOfDay.fromDateTime(value).format(context);
-    return '$date Â· $time';
+    return '$date · $time';
   }
 
   @override
   Widget build(BuildContext context) {
+    AppLanguageScope.watch(context);
     final firm = _data?['firm'] as Map<String, dynamic>?;
     final user = _data?['user'] as Map<String, dynamic>?;
     final firmStatus = (firm?['status'] ?? '').toString();
@@ -7661,10 +7674,10 @@ class _InfoLicensePageState extends State<InfoLicensePage> {
                               ready: _catalogCount > 0,
                               warning: false,
                               value: _catalogCount > 0
-                                  ? isEnglish
-                                        ? '$_catalogCount items'
-                                        : '$_catalogCount Artikel'
-                                  : tr('Nicht verfÃ¼gbar', 'Not available'),
+                                  ? tr("{count} Artikel", "{count} items", {
+                                      'count': _catalogCount,
+                                    })
+                                  : tr('Nicht verfügbar', 'Not available'),
                               detail: _formatSettingsDate(_catalogCachedAt),
                             ),
                             const _SettingsDivider(),
@@ -7678,9 +7691,9 @@ class _InfoLicensePageState extends State<InfoLicensePage> {
                                       'Keine Bilder gespeichert',
                                       'No images saved',
                                     )
-                                  : isEnglish
-                                  ? '${_offlineImageStatus.imageCount} images'
-                                  : '${_offlineImageStatus.imageCount} Bilder',
+                                  : tr("{count} Bilder", "{count} images", {
+                                      'count': _offlineImageStatus.imageCount,
+                                    }),
                               detail: _formatStorageSize(
                                 _offlineImageStatus.totalBytes,
                               ),
@@ -7692,11 +7705,13 @@ class _InfoLicensePageState extends State<InfoLicensePage> {
                               ready: _offlineDaysRemaining > 0,
                               warning: false,
                               value: _offlineDaysRemaining > 0
-                                  ? isEnglish
-                                        ? '$_offlineDaysRemaining days remaining'
-                                        : 'Noch $_offlineDaysRemaining Tage'
+                                  ? tr(
+                                      "Noch {count} Tage",
+                                      "{count} days remaining",
+                                      {'count': _offlineDaysRemaining},
+                                    )
                                   : tr(
-                                      'Erneute PrÃ¼fung nÃ¶tig',
+                                      'Erneute Prüfung nötig',
                                       'New check required',
                                     ),
                               detail: _formatSettingsDate(_lastLicenseCheck),
@@ -7772,9 +7787,16 @@ class _InfoLicensePageState extends State<InfoLicensePage> {
                                       'Noch keine Bilder gespeichert',
                                       'No images saved yet',
                                     )
-                                  : isEnglish
-                                  ? '${_offlineImageStatus.imageCount} images · ${_formatStorageSize(_offlineImageStatus.totalBytes)}'
-                                  : '${_offlineImageStatus.imageCount} Bilder · ${_formatStorageSize(_offlineImageStatus.totalBytes)}',
+                                  : tr(
+                                      "{count} Bilder · {size}",
+                                      "{count} images · {size}",
+                                      {
+                                        'count': _offlineImageStatus.imageCount,
+                                        'size': _formatStorageSize(
+                                          _offlineImageStatus.totalBytes,
+                                        ),
+                                      },
+                                    ),
                               onTap: _openOfflineImages,
                             ),
                             const _SettingsDivider(),
@@ -7805,12 +7827,8 @@ class _InfoLicensePageState extends State<InfoLicensePage> {
                             _SettingsTile(
                               icon: Icons.translate,
                               title: tr('Sprache', 'Language'),
-                              value:
-                                  appLanguageController.value ==
-                                      AppLanguage.english
-                                  ? 'English'
-                                  : 'Deutsch',
-                              onTap: _chooseLanguage,
+                              value: appLanguageController.value.nativeName,
+                              onTap: () => chooseAppLanguage(context),
                             ),
                             const _SettingsDivider(),
                             _SettingsTile(
@@ -8084,23 +8102,23 @@ class _DxfInstallationPreview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
-      children: const [
+      children: [
         Expanded(
           child: _DxfInstallationPreviewItem(
             type: _DxfCutIconType.auflage,
-            label: 'Auflage',
+            label: tr('Auflage', 'Top mount'),
           ),
         ),
         Expanded(
           child: _DxfInstallationPreviewItem(
             type: _DxfCutIconType.unterbau,
-            label: 'Unterbau',
+            label: tr('Unterbau', 'Undermount'),
           ),
         ),
         Expanded(
           child: _DxfInstallationPreviewItem(
             type: _DxfCutIconType.flaechenbuendig,
-            label: 'Flächenbündig',
+            label: tr('Flächenbündig', 'Flush mount'),
           ),
         ),
       ],
@@ -8206,30 +8224,6 @@ class _SettingsStatusBadge extends StatelessWidget {
           fontSize: 12,
         ),
       ),
-    );
-  }
-}
-
-class _LanguageChoiceTile extends StatelessWidget {
-  final String title;
-  final bool selected;
-  final VoidCallback onTap;
-
-  const _LanguageChoiceTile({
-    required this.title,
-    required this.selected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return ListTile(
-      onTap: onTap,
-      contentPadding: EdgeInsets.zero,
-      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
-      trailing: selected
-          ? const Icon(Icons.check_circle, color: Color(0xFF2E7D32))
-          : const Icon(Icons.circle_outlined, color: Colors.black26),
     );
   }
 }
@@ -8491,9 +8485,9 @@ class _SiteReadinessPageState extends State<_SiteReadinessPage> {
                       ready: _licenseReady,
                       warning: false,
                       value: _licenseReady
-                          ? isEnglish
-                                ? '$_offlineDaysRemaining days remaining'
-                                : 'Noch $_offlineDaysRemaining Tage'
+                          ? tr("Noch {count} Tage", "{count} days remaining", {
+                              'count': _offlineDaysRemaining,
+                            })
                           : tr('Erneute Prüfung nötig', 'New check required'),
                       detail: _formatDate(_lastLicenseCheck),
                     ),
@@ -8504,9 +8498,9 @@ class _SiteReadinessPageState extends State<_SiteReadinessPage> {
                       ready: _catalogReady,
                       warning: false,
                       value: _catalogReady
-                          ? isEnglish
-                                ? '${_catalog.length} items'
-                                : '${_catalog.length} Artikel'
+                          ? tr("{count} Artikel", "{count} items", {
+                              'count': _catalog.length,
+                            })
                           : tr('Nicht verfügbar', 'Not available'),
                       detail: _formatDate(_catalogUpdatedAt),
                     ),
@@ -8528,9 +8522,14 @@ class _SiteReadinessPageState extends State<_SiteReadinessPage> {
                   const SizedBox(height: 10),
                   Text(
                     _totalImages > 0
-                        ? isEnglish
-                              ? 'Images: $_processedImages of $_totalImages'
-                              : 'Bilder: $_processedImages von $_totalImages'
+                        ? tr(
+                            "Bilder: {processed} von {total}",
+                            "Images: {processed} of {total}",
+                            {
+                              'processed': _processedImages,
+                              'total': _totalImages,
+                            },
+                          )
                         : tr(
                             'Lizenz und Katalog werden geprüft…',
                             'Checking license and catalog…',
@@ -8724,9 +8723,11 @@ class _OfflineImagesPageState extends State<_OfflineImagesPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            isEnglish
-                ? '${result.available} images are available offline.'
-                : '${result.available} Bilder sind offline verfügbar.',
+            tr(
+              "{count} Bilder sind offline verfügbar.",
+              "{count} images are available offline.",
+              {'count': result.available},
+            ),
           ),
         ),
       );
@@ -8839,9 +8840,16 @@ class _OfflineImagesPageState extends State<_OfflineImagesPage> {
                   LinearProgressIndicator(value: progress),
                   const SizedBox(height: 10),
                   Text(
-                    isEnglish
-                        ? '$_processed of $_total · $_available saved · $_failed failed'
-                        : '$_processed von $_total · $_available gespeichert · $_failed fehlgeschlagen',
+                    tr(
+                      "{processed} von {total} · {available} gespeichert · {failed} fehlgeschlagen",
+                      "{processed} of {total} · {available} saved · {failed} failed",
+                      {
+                        'processed': _processed,
+                        'total': _total,
+                        'available': _available,
+                        'failed': _failed,
+                      },
+                    ),
                     textAlign: TextAlign.center,
                     style: const TextStyle(color: Colors.black54),
                   ),
@@ -9074,7 +9082,10 @@ class _AccountLicensePage extends StatelessWidget {
                 label: tr('Name', 'Name'),
                 value: '${user?['name'] ?? ''}',
               ),
-              _InfoRow(label: 'E-Mail', value: '${user?['email'] ?? ''}'),
+              _InfoRow(
+                label: tr('E-Mail', 'Email'),
+                value: '${user?['email'] ?? ''}',
+              ),
               _InfoRow(
                 label: tr('Rolle', 'Role'),
                 value: '${user?['role'] ?? ''}',
@@ -9947,18 +9958,19 @@ String _dxfAciColorName(int aci) {
 }
 
 String _localizedDxfColorName(String name) {
-  if (!isEnglish) return name;
-
   return switch (name) {
-    'Rot' => 'Red',
-    'Gelb' => 'Yellow',
-    'Grün' => 'Green',
-    'Blau' => 'Blue',
-    'Weiß' => 'White',
-    'Grau' => 'Gray',
-    'Hellgrau' => 'Light gray',
-    'Violett' => 'Violet',
-    'Braun' => 'Brown',
+    'Rot' => tr('Rot', 'Red'),
+    'Gelb' => tr('Gelb', 'Yellow'),
+    'Grün' => tr('Grün', 'Green'),
+    'Cyan' => tr('Cyan', 'Cyan'),
+    'Blau' => tr('Blau', 'Blue'),
+    'Magenta' => tr('Magenta', 'Magenta'),
+    'Weiß' => tr('Weiß', 'White'),
+    'Grau' => tr('Grau', 'Gray'),
+    'Hellgrau' => tr('Hellgrau', 'Light gray'),
+    'Orange' => tr('Orange', 'Orange'),
+    'Violett' => tr('Violett', 'Violet'),
+    'Braun' => tr('Braun', 'Brown'),
     _ => name,
   };
 }

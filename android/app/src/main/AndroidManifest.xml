@@ -6,8 +6,12 @@
         android:label="ATool"
         android:name="${applicationName}"
         android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="false"
         android:icon="@mipmap/ic_launcher">
+        <meta-data
+            android:name="asset_statements"
+            android:resource="@string/asset_statements" />
         <activity
             android:name=".MainActivity"
             android:exported="true"

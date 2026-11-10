@@ -56,8 +56,12 @@ buildTypes {
     release {
         signingConfig = signingConfigs.getByName("release")
 
-        isMinifyEnabled = false
-        isShrinkResources = false
+        isMinifyEnabled = true
+        isShrinkResources = true
+        proguardFiles(
+            getDefaultProguardFile("proguard-android-optimize.txt"),
+            "proguard-rules.pro",
+        )
     }
 }
 }
@@ -68,4 +72,6 @@ flutter {
 
 dependencies {
     implementation("androidx.documentfile:documentfile:1.0.1")
+    implementation("androidx.credentials:credentials:1.6.0")
+    implementation("androidx.credentials:credentials-play-services-auth:1.6.0")
 }

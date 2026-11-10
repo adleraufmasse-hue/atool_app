@@ -14,9 +14,11 @@ class MainActivity : FlutterActivity() {
     private val downloadsChannel = "de.adleraufmasse.atool/downloads"
     private val pickDirectoryRequestCode = 4711
     private var pendingPickResult: MethodChannel.Result? = null
+    private var restoreCredentials: AndroidRestoreCredentials? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        restoreCredentials = AndroidRestoreCredentials(this, flutterEngine.dartExecutor.binaryMessenger)
 
         MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
@@ -28,6 +30,12 @@ class MainActivity : FlutterActivity() {
                 else -> result.notImplemented()
             }
         }
+    }
+
+    override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
+        restoreCredentials?.dispose()
+        restoreCredentials = null
+        super.cleanUpFlutterEngine(flutterEngine)
     }
 
     private fun pickDownloadDirectory(result: MethodChannel.Result) {
